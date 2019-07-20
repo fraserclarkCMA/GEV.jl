@@ -12,7 +12,6 @@ using CSV, DataFrames, Optim, StatsModels
 
 # cd into GEV.jl
  #= path to GEV.jl =#
-; cd Git/GEV
 df = CSV.read("./Examples/Data/restaurant.csv");
 
 # ********************* ADD NESTS TO THE DATAFRAME ************************* #

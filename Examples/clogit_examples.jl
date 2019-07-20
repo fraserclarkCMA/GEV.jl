@@ -12,7 +12,7 @@ using CSV, DataFrames, Optim, StatsModels
 
 # cd into GEV.jl
 #= path to GEV.jl =#
-df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv");
+df = CSV.read("./Examples/Data/restaurant.csv");
 
 # ******************************************************** #
 
