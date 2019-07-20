@@ -11,8 +11,8 @@ using GEV
 using CSV, DataFrames, Optim, StatsModels
 
 # cd into GEV.jl
-; #= path to GEV.jl =#
-df = CSV.read("./Examples/Data/restaurant.csv");
+#= path to GEV.jl =#
+df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv");
 
 # ******************************************************** #
 
@@ -36,9 +36,10 @@ result = optimize(x->clogit_loglike(x,cl), zeros(clm.nx); autodiff = :forward)
 # Optimal parameter value
 LLstar = -Optim.minimum(result);
 xstar = Optim.minimizer(result);
-se = std_err(x->clogit_loglike(x,cl), Optim.minimizer(result))
-coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
+se = std_err(x->clogit_loglike(x,cl), Optim.minimizer(result));
+coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se]);
 
 # Print out results
 println("Log-likelihood = $(round(LLstar,digits=4))")
-vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
+vcat(["Variable" "Coef." "std err"],
+	[cl.model.coefnames xstar se])

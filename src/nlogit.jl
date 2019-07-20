@@ -160,7 +160,7 @@ function theta_to_vec!(x::Vector{T}, θ::nlogit_param, flags::Dict, idx::Dict) w
 	end
 end
 
-function nlogit_loglike(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, flags::Dict, idx::Dict, RUM::Bool) where T<:Real
+function ll_nlogit(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, flags::Dict, idx::Dict, RUM::Bool) where T<:Real
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, tau, lambda = θ
 	
@@ -191,7 +191,6 @@ function nlogit_loglike(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, flags:
 				end
 				push!(denom, λ_k*logsumexp(V))	
 			end		
-
 		end
 		LL += -logsumexp(denom)
 	end
@@ -199,7 +198,189 @@ function nlogit_loglike(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, flags:
 end
 
 # loglike wrapper for nlogit_model
-nlogit_loglike(x::Vector{T}, nlmod::nlogit_model, nldata::nlogit_data) where T<:Real = 
-	nlogit_loglike(x, nlmod.params, nldata, nlmod.flags, nlmod.idx, nlmod.opts[:RUM])
+ll_nlogit(x::Vector{T}, nlmod::nlogit_model, nldata::nlogit_data) where T<:Real = 
+	ll_nlogit(x, nlmod.params, nldata, nlmod.flags, nlmod.idx, nlmod.opts[:RUM])
 
-nlogit_loglike(x::Vector{T}, nl::nlogit) where T<:Real = nlogit_loglike(x, nl.model, nl.data)
+ll_nlogit(x::Vector{T}, nl::nlogit) where T<:Real = ll_nlogit(x, nl.model, nl.data)
+
+# Functions to wrap in parallel version
+function ll_nlogit_case(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, id::Int64, RUM::Bool) where T<:Real 
+	vec_to_theta!(x, θ, flags, idx)	
+	@unpack beta, alpha, tau, lambda = θ
+	Numλ = length(tau)	
+	LL = 0.
+	denom = Vector{Real}()
+	for nest_data in nld[id]
+		@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		if Numλ > 1 
+			λ_k = RUM ? fun_lambda(tau[nest_num]) : tau[nest_num]
+			σ_k = RUM ? fun_sigma(tau[nest_num]) : 1.0 / tau[nest_num]
+		else 
+			λ_k = RUM ? fun_lambda(tau[1]) : tau[1]
+			σ_k = RUM ? fun_sigma(tau[1]) : 1.0 / tau[1]
+		end
+		V = Xj*beta /λ_k
+		if flags[:alpha]
+			W = Wk*alpha
+			if nest_star == nest_num
+				LL += V[jstar] + W[1] + (λ_k - 1.0)*logsumexp(V)
+			end
+			push!(denom, W[1] + λ_k*logsumexp(V))	
+		else 
+			if nest_star == nest_num
+				LL += V[jstar] + (λ_k - 1.0)*logsumexp(V)
+			end
+			push!(denom, λ_k*logsumexp(V))	
+		end		
+	end
+	LL += -logsumexp(denom)
+	return -LL 
+end
+
+ll_nlogit_case(x::Vector{T}, id::Int64, nlmod::nlogit_model, nldata::nlogit_data) where T<:Real = 
+	ll_nlogit_case(x, nlmod.params, nldata, id, nlmod.flags, nlmod.idx, nlmod.opts[:RUM])
+
+ll_nlogit_case(x::Vector{T}, id::Int64, nl::nlogit) where T<:Real = ll_nlogit_case(x, id, nl.model, nl.data)
+
+struct nlogit_case{T<:Real} 
+	F :: T
+	G :: Vector{T}
+	H :: Matrix{T}
+end
+
+function grad_nlogit_case(theta::Vector{T}, nld::nlogit_data, id::Int64) where T<:Real
+	ForwardDiff.gradient(x->ll_nlogit_case(x, nld, id), theta)
+end
+
+function hessian_nlogit_case(theta::Vector{T}, nld::nlogit_data, id::Int64) where T<:Real
+	ForwardDiff.hessian(x->ll_nlogit_case(x, nld, id), theta)
+end
+
+function fg_nlogit_case(theta::Vector{T}, nld::nlogit_data, id::Int64) where T<:Real
+	nlogit_case(ll_clogit_case(theta, nld, id), grad_clogit_case(theta, nld, id), Matrix{T}(undef,0,0)) 
+end
+
+function fgh_nlogit_case(theta::Vector{T}, nld::nlogit_data, id::Int64) where T<:Real
+	nlogit_case(ll_nlogit_case(theta, nld, id), grad_nlogit_case(theta, nld, id), hessian_nlogit_case(theta, nld, id)) 
+end
+
+
+function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, 
+						x_initial = randn(cl.model.nx), algorithm = LBFGS(), 
+						optim_opts = Optim.Options(), workers=workers())
+
+
+	clos_ll_nlogit_case(pd) = ll_nlogit_case(pd.theta, nl.data, pd.id)
+	clos_grad_nlogit_case(pd) = ll_nlogit_case(pd.theta, nl.data, pd.id)
+	clos_hessian_nlogit_case(pd) = hessian_nlogit_case(pd.theta, nl.data, pd.id)
+	clos_fg_nlogit_case(pd) = fg_nlogit_case(pd.theta, nl.data, pd.id)
+	clos_fgh_nlogit_case(pd) = fgh_nlogit_case(pd.theta, nl.data, pd.id)
+	
+	if opt_mode == :parallel
+		pool = CachingPool(workers)
+
+		function pmap_nlogit_ll(theta::Vector{T}) where T<:Real 
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			sum(pmap(clos_ll_nlogit_case, pool, pd))
+		end
+
+		function pmap_nlogit_grad(theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			sum(pmap(clos_grad_clogit_case, pool, pd))
+		end
+
+		function pmap_nlogit_Hess(theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			sum(pmap(clos_hessian_nlogit_case, pool, pd))
+		end
+
+		function pmap_nlogit_fg!(F, G, theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			nlc = pmap(clos_fg_nlogit_case, pool, pd)
+			if G != nothing
+				G[:] = sum([y.G for y in nlc])
+			end
+			if F != nothing
+				return sum([y.F for y in nlc])
+			end
+		end
+
+		function pmap_nlogit_fgh!(F, G, H, theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			nlc = pmap(clos_fgh_nlogit_case, pool, pd)
+			if H != nothing
+				H[:] = sum([y.H for y in nlc])
+			end
+			if G != nothing
+				G[:] = sum([y.G for y in nlc])
+			end
+			if F != nothing
+				return sum([y.F for y in nlc])
+			end
+		end
+
+		if opt_method == :grad
+			out = Optim.optimize(Optim.only_fg!(pmap_nlogit_fg!), x_initial, algorithm, optim_opts)
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(pmap_nlogit_fgh!), x_initial, algorithm, optim_opts)
+		else 
+			out = Optim.optimize(pmap_nlogit_ll, x_initial, NelderMead(), optim_opts)
+		end
+
+		clear!(pool)
+
+	elseif opt_mode == :serial 
+		function map_nlogit_ll(theta::Vector{T}) where T<:Real 
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			sum(map(clos_ll_nlogit_case, pool, pd))
+		end
+
+		function map_nlogit_grad(theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			sum(map(clos_grad_clogit_case, pool, pd))
+		end
+
+		function map_nlogit_Hess(theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			sum(map(clos_hessian_nlogit_case, pool, pd))
+		end
+
+		function map_nlogit_fg!(F, G, theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			nlc = map(clos_fg_nlogit_case, pool, pd)
+			if G != nothing
+				G[:] = sum([y.G for y in nlc])
+			end
+			if F != nothing
+				return sum([y.F for y in nlc])
+			end
+		end
+
+		function map_nlogit_fgh!(F, G, H, theta::Vector{T}) where T<:Real
+			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
+			nlc = map(clos_fgh_nlogit_case, pool, pd)
+			if H != nothing
+				H[:] = sum([y.H for y in nlc])
+			end
+			if G != nothing
+				G[:] = sum([y.G for y in nlc])
+			end
+			if F != nothing
+				return sum([y.F for y in nlc])
+			end
+		end
+
+		if opt_method == :grad
+			out = Optim.optimize(Optim.only_fg!(map_nlogit_fg!), x_initial, algorithm, optim_opts)
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(map_nlogit_fgh!), x_initial, algorithm, optim_opts)
+		else 
+			out = Optim.optimize(map_nlogit_ll, x_initial, NelderMead(), optim_opts)
+		end
+
+	else
+		out = Optim.optimize(x->ll_nlogit(x, nl.data), x_initial, algorithm, optim_opts; autodiff=:forward )
+	end 
+
+	return out
+end

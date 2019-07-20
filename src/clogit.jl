@@ -57,7 +57,12 @@ struct clogit
 	data 	:: clogit_data
 end
 
-function clogit_loglike(beta::Vector{T}, cld::clogit_data) where T<:Real
+struct passdata{T<:Real}
+	theta :: Vector{T}
+	id 	  :: Int64
+end
+
+function ll_clogit(beta::Vector{T}, cld::clogit_data) where T<:Real
 	LL = 0.
 	for case_data in cld 
 		@unpack jstar, dstar, Xj = case_data
@@ -67,4 +72,156 @@ function clogit_loglike(beta::Vector{T}, cld::clogit_data) where T<:Real
 	return -LL
 end
 
-clogit_loglike(beta::Vector{T}, cl::clogit) where T<:Real = clogit_loglike(beta, cl.data)
+ll_clogit(beta::Vector{T}, cl::clogit) where T<:Real = ll_clogit(beta, cl.data)
+
+# For parallel version
+
+
+
+function ll_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real
+	@unpack jstar, dstar, Xj = cld[id]
+	V = Xj*beta
+	LL = V[jstar] - logsumexp(V)
+	return -LL 
+end
+
+struct clogit_case{T<:Real} 
+	F :: T
+	G :: Vector{T}
+	H :: Matrix{T}
+end
+
+function grad_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real
+	ForwardDiff.gradient(x->ll_clogit_case(x, cld, id), beta)
+end
+
+function hessian_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real
+	ForwardDiff.hessian(x->ll_clogit_case(x, cld, id), beta)
+end
+
+function fg_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real
+	clogit_case(ll_clogit_case(beta, cld, id), grad_clogit_case(beta, cld, id), Matrix{T}(undef,0,0)) 
+end
+
+function fgh_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real
+	clogit_case(ll_clogit_case(beta, cld, id), grad_clogit_case(beta, cld, id), hessian_clogit_case(beta, cld, id)) 
+end
+
+# Wrapper for Estimation
+function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, 
+						x_initial = randn(cl.model.nx), algorithm = LBFGS(), 
+						optim_opts = Optim.Options(), workers=workers())
+
+	clos_ll_clogit_case(pd) = ll_clogit_case(pd.theta, cl.data, pd.id)
+	clos_grad_clogit_case(pd) = ll_clogit_case(pd.theta, cl.data, pd.id)
+	clos_hessian_clogit_case(pd) = hessian_clogit_case(pd.theta, cl.data, pd.id)
+	clos_fg_clogit_case(pd) = fg_clogit_case(pd.theta, cl.data, pd.id)
+	clos_fgh_clogit_case(pd) = fgh_clogit_case(pd.theta, cl.data, pd.id)
+
+	if opt_mode == :parallel 
+		pool = CachingPool(workers)
+	
+		function pmap_clogit_ll(beta::Vector{T}) where T<:Real 
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			sum(pmap(clos_ll_clogit_case, pool, pd))
+		end
+
+		function pmap_clogit_grad(beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			sum(pmap(clos_grad_clogit_case, pool, pd))
+		end
+
+		function pmap_clogit_Hess(beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			sum(pmap(clos_hessian_clogit_case, pool, pd))
+		end
+
+		function pmap_clogit_fg!(F, G, beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			clc = pmap(clos_fg_clogit_case, pool, pd)
+			if G != nothing
+				G[:] = sum([y.G for y in clc])
+			end
+			if F != nothing
+				return sum([y.F for y in clc])
+			end
+		end
+
+		function pmap_clogit_fgh!(F, G, H, beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			clc = pmap(clos_fgh_clogit_case, pool, pd)
+			if H != nothing
+				H[:] = sum([y.H for y in clc])
+			end
+			if G != nothing
+				G[:] = sum([y.G for y in clc])
+			end
+			if F != nothing
+				return sum([y.F for y in clc])
+			end
+		end
+
+		if opt_method == :grad
+			out = Optim.optimize(Optim.only_fg!(pmap_clogit_fg!), x_initial, algorithm, optim_opts)
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(pmap_clogit_fgh!), x_initial, algorithm, optim_opts)
+		else 
+			out = Optim.optimize(pmap_clogit_ll, x_initial, NelderMead(), optim_opts)
+		end
+
+		clear!(pool)
+	elseif opt_mode == :serial
+
+		function map_clogit_ll(beta::Vector{T}) where T<:Real 
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			sum(map(clos_ll_clogit_case, pd))
+		end
+
+		function map_clogit_grad(beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			sum(map(clos_grad_clogit_case, pd))
+		end
+
+		function map_clogit_Hess(beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			sum(map(clos_hessian_clogit_case, pd))
+		end
+
+		function map_clogit_fg!(F, G, beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			clc = map(clos_fg_clogit_case, pd)
+			if G != nothing
+				G[:] = sum([y.G for y in clc])
+			end
+			if F != nothing
+				return sum([y.F for y in clc])
+			end
+		end
+
+		function map_clogit_fgh!(F, G, H, beta::Vector{T}) where T<:Real
+			pd = [passdata(beta, i) for i in 1:length(cl.data)]	
+			YY = map(clos_fgh_clogit_case, pd)
+			if H != nothing
+				H[:] = sum([yy.H for yy in YY])
+			end
+			if G != nothing
+				G[:] = sum([yy.G for yy in YY])
+			end
+			if F != nothing
+				return sum([yy.F for yy in YY])
+			end
+		end
+
+		if opt_method == :grad
+			out = Optim.optimize(Optim.only_fg!(map_clogit_fg!), x_initial, algorithm, optim_opts)
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(map_clogit_fgh!), x_initial, algorithm, optim_opts)
+		else 
+			out = Optim.optimize(map_clogit_ll, x_initial, NelderMead(), optim_opts)
+		end
+	else 
+		out = Optim.optimize(x->ll_clogit(x, cl.data), x_initial, algorithm, optim_opts; autodiff=:forward )
+	end
+
+	return out
+end

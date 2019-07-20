@@ -22,13 +22,9 @@ using GEV
 
 using GEV
 
-# Additional packages for examples 
 using CSV, DataFrames, Optim, StatsModels
 df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv");
 
-# ******************************************************** #
-
-# ************ ESTIMATE CONDITIONAL LOGIT ****************** #
 # clogit formula
 f1 = @formula( chosen ~ cost + distance + rating);
 
@@ -38,24 +34,27 @@ clm = clogit_model(f1, df ; case=:family_id, choice_id=:restaurant)
 # Conditional Logit
 cl = clogit( clm, make_clogit_data(clm, df));
 
-# Test Code
-x0 = rand(cl.model.nx)
-clogit_loglike(x0, cl)
+# Two options - the first one default to use autodiff
 
-# Optimise clogit model
+# Option 1. Estimate clogit model 
+result = estimate_clogit(cl; opt_mode = :serial,
+							 opt_method = :grad,  
+							x_initial = randn(cl.model.nx),
+							algorithm = LBFGS(),
+							optim_opts = Optim.Options());
+
+# Option 2. Optimise clogit model directly through Optim
 result = optimize(x->clogit_loglike(x,cl), zeros(clm.nx); autodiff = :forward)
 
 # Optimal parameter value
 LLstar = -Optim.minimum(result);
 xstar = Optim.minimizer(result);
-se = std_err(x->clogit_loglike(x,cl), Optim.minimizer(result))
+se = std_err(x->ll_clogit(x,cl), Optim.minimizer(result))
 coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 
 # Print out results - this is working and checks out versus stata!
 println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
-
-
 
 # ********************* ADD NESTS TO THE DATAFRAME ************************* #
 
@@ -82,10 +81,10 @@ nlm1 = nlogit_model(f1, df; case=:family_id, nests = :nestnum, choice_id=:family
 nl1 = nlogit(nlm1, make_nlogit_data(nlm1, df));
 
 # Optimize
-opt1 = optimize(x->nlogit_loglike(x, nl1), rand(nl1.model.nx), BFGS(); autodiff=:forward)
+opt1 = optimize(x->ll_nlogit(x, nl1), rand(nl1.model.nx), BFGS(); autodiff=:forward)
 xstar1 = Optim.minimizer(opt1);
-se1 = std_err(x->nlogit_loglike(x, nl1), xstar1  );
-LL1 = nlogit_loglike(xstar1, nl1);
+se1 = std_err(x->ll_nlogit(x, nl1), xstar1  );
+LL1 = ll_nlogit(xstar1, nl1);
 
 println("Log-likelihood = $(round(LL1,digits=4))")
 vcat(["Variable" "Coef." "std err"],[nl1.model.coefnames xstar1 se1])
@@ -102,10 +101,10 @@ nlm2 = nlogit_model(f1, f2, df; case=:family_id, nests = :nestnum, choice_id=:fa
 nl2 = nlogit(nlm2, make_nlogit_data(nlm2, df));
 
 # Optimize
-opt2 = optimize(x->nlogit_loglike(x, nl2), rand(nl2.model.nx), BFGS(); autodiff=:forward)
+opt2 = optimize(x->ll_nlogit(x, nl2), rand(nl2.model.nx), BFGS(); autodiff=:forward)
 xstar2 = Optim.minimizer(opt2);
-se2 = std_err(x->nlogit_loglike(x, nl2), xstar2  );
-LL2 = nlogit_loglike(xstar2, nl2);
+se2 = std_err(x->ll_nlogit(x, nl2), xstar2  );
+LL2 = ll_nlogit(xstar2, nl2);
 
 println("Log-likelihood = $(round(LL2,digits=4))")
 vcat(["Variable" "Coef." "std err"],[nl2.model.coefnames xstar2 se2])
@@ -124,10 +123,10 @@ nlm3 = nlogit_model(f1, f3, df;
 nl3 = nlogit(nlm3, make_nlogit_data(nlm3, df));
 
 # Optimize
-opt3 = optimize(x->nlogit_loglike(x, nl3), rand(nl3.model.nx), BFGS(); autodiff=:forward)
+opt3 = optimize(x->ll_nlogit(x, nl3), rand(nl3.model.nx), BFGS(); autodiff=:forward)
 xstar3 = Optim.minimizer(opt3);
-se3 = std_err(x->nlogit_loglike(x, nl3), xstar3  );
-LL3 = nlogit_loglike(xstar3, nl3);
+se3 = std_err(x->ll_nlogit(x, nl3), xstar3  );
+LL3 = ll_nlogit(xstar3, nl3);
 
 println("Log-likelihood = $(round(LL3,digits=4))")
 vcat(["Variable" "Coef." "std err"],[nl3.model.coefnames xstar3 se3])
