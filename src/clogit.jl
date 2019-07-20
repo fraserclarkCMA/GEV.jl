@@ -169,7 +169,6 @@ function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none,
 			out = Optim.optimize(pmap_clogit_ll, x_initial, NelderMead(), optim_opts)
 		end
 
-		clear!(pool)
 	elseif opt_mode == :serial
 
 		function map_clogit_ll(beta::Vector{T}) where T<:Real 
