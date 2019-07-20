@@ -8,7 +8,7 @@ Estimation can be implmented in parallel or serial through wrappers for estimati
 
 The user can pass Optim.jl options to control which algorithm is used and the `Optim.options()` can also be passed to control other aspects of the optimization.
 
-Below is an example that uses the stata example dataset
+Below is an example that uses the stata example dataset in is nlogit command:
 
 ```
 using GEV, CSV, DataFrames, Optim, StatsModels
@@ -50,6 +50,6 @@ println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
 ```
 
-At this early stage other usage examples are stored in the Examples folder. They replicate example from analogous help files in Stata and show how to implement a parallel version (in case the data is very large).
+At this early stage other usage examples are stored in the Examples folder. They replicate examples from analogous help files in Stata and show how to implement a parallel version (in case the data is very large).
 
 The nested logit is non-convex and so multiple starting points are advisable.
