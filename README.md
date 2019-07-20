@@ -1,3 +1,5 @@
+## Generalized Extreme Value (GEV)
+
 This is a package estimates Generalized Extreme Value (GEV) models. The project is in the early phases of development and is not documented - amongst other things. 
 
 Currently, the package implement conditional and 2-level nested logit models on datasets supplied by the user in a DataFrame, makes use of StatsModels.jl formula to specify the model and implements using the Optim.jl framework.
@@ -8,7 +10,7 @@ The user can pass Optim.jl options to control which algorithm is used and the `O
 
 Below is an example that uses the stata example dataset
 
-'''
+```
 using GEV, CSV, DataFrames, Optim, StatsModels
 
 # Load in the data
@@ -46,7 +48,7 @@ coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 # Print out results
 println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
-'''
+```
 
 At this early stage other usage examples are stored in the Examples folder. They replicate example from analogous help files in Stata and show how to implement a parallel version (in case the data is very large).
 
