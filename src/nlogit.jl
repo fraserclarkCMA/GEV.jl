@@ -328,8 +328,6 @@ function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none,
 			out = Optim.optimize(pmap_nlogit_ll, x_initial, NelderMead(), optim_opts)
 		end
 
-		clear!(pool)
-
 	elseif opt_mode == :serial 
 		function map_nlogit_ll(theta::Vector{T}) where T<:Real 
 			pd = [passdata(theta, i) for i in 1:length(nl.data)]	
