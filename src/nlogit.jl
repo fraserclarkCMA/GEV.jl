@@ -458,7 +458,7 @@ end
 
 function estimate_nlogit(model::nlogit_model, data::nlogit_data; 
 							opt_mode = :serial, opt_method = :none, grad_type = :analytic,
-							x_initial = randn(model.nx), algorithm = LBFGS(), 
+							x_initial = randn(model.nx), algorithm = LBFGS(), batch_size=1,
 							optim_opts = Optim.Options(), workers=workers())
 	
 	clos_ll_nlogit_case(pd) = ll_nlogit_case(pd.theta, model, data, pd.id)
@@ -474,17 +474,17 @@ function estimate_nlogit(model::nlogit_model, data::nlogit_data;
 
 		function pmap_nlogit_ll(theta::Vector{T}) where T<:Real 
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			sum(pmap(clos_ll_nlogit_case, pool, PD))
+			sum(pmap(clos_ll_nlogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_nlogit_analytic_grad(theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			sum(pmap(clos_analytic_grad_clogit_case, pool, PD))
+			sum(pmap(clos_analytic_grad_clogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_nlogit_analytic_fg!(F, G, theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			nlc = pmap(clos_analytic_fg_nlogit_case, pool, PD)
+			nlc = pmap(clos_analytic_fg_nlogit_case, pool, PD, batch_size=batch_size)
 			if G != nothing
 				G[:] = sum([y.G for y in nlc])
 			end
@@ -495,17 +495,17 @@ function estimate_nlogit(model::nlogit_model, data::nlogit_data;
 
 		function pmap_nlogit_grad(theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			sum(pmap(clos_grad_clogit_case, pool, PD))
+			sum(pmap(clos_grad_clogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_nlogit_Hess(theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			sum(pmap(clos_hessian_nlogit_case, pool, PD))
+			sum(pmap(clos_hessian_nlogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_nlogit_fg!(F, G, theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			nlc = pmap(clos_fg_nlogit_case, pool, PD)
+			nlc = pmap(clos_fg_nlogit_case, pool, PD, batch_size=batch_size)
 			if G != nothing
 				G[:] = sum([y.G for y in nlc])
 			end
@@ -516,7 +516,7 @@ function estimate_nlogit(model::nlogit_model, data::nlogit_data;
 
 		function pmap_nlogit_fgh!(F, G, H, theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(data)]	
-			nlc = pmap(clos_fgh_nlogit_case, pool, PD)
+			nlc = pmap(clos_fgh_nlogit_case, pool, PD, batch_size=batch_size)
 			if H != nothing
 				H[:] = sum([y.H for y in nlc])
 			end
@@ -618,10 +618,9 @@ function estimate_nlogit(model::nlogit_model, data::nlogit_data;
 end
 
 function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, grad_type = :analytic,
-						x_initial = randn(nl.model.nx), algorithm = LBFGS(), 
+						x_initial = randn(nl.model.nx), algorithm = LBFGS(), batch_size=1,
 						optim_opts = Optim.Options(), workers=workers())
-	estimate_nlogit(nl.model, nl.data; 
-					opt_mode = opt_mode, opt_method = opt_method, grad_type = grad_type,
-					x_initial = x_initial , algorithm = algorithm, 
+	estimate_nlogit(nl.model, nl.data; opt_mode = opt_mode, opt_method = opt_method, grad_type = grad_type,
+					x_initial = x_initial , algorithm = algorithm, batch_size=batch_size,
 					optim_opts = optim_opts, workers=workers)
 end

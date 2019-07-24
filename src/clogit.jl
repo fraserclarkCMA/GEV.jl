@@ -74,10 +74,6 @@ end
 
 ll_clogit(beta::Vector{T}, cl::clogit) where T<:Real = ll_clogit(beta, cl.data)
 
-# For parallel version
-
-
-
 function ll_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real
 	@unpack jstar, dstar, Xj = cld[id]
 	V = Xj*beta
@@ -176,7 +172,7 @@ end
 
 # Wrapper for Estimation
 function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, grad_type = :analytic,
-						x_initial = randn(cl.model.nx), algorithm = LBFGS(), 
+						x_initial = randn(cl.model.nx), algorithm = LBFGS(), batch_size = 1, 
 						optim_opts = Optim.Options(), workers=workers())
 
 	clos_ll_clogit_case(pd) = ll_clogit_case(pd.theta, cl.data, pd.id)
@@ -192,17 +188,17 @@ function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, gra
 	
 		function pmap_clogit_ll(beta::Vector{T}) where T<:Real 
 			PD = [passdata(beta, i) for i in 1:length(cl.data)]	
-			sum(pmap(clos_ll_clogit_case, pool, PD))
+			sum(pmap(clos_ll_clogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_clogit_analytic_grad(beta::Vector{T}) where T<:Real
 			PD = [passdata(beta, i) for i in 1:length(cl.data)]	
-			sum(pmap(clos_analytic_grad_clogit_case, pool, PD))
+			sum(pmap(clos_analytic_grad_clogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_clogit_analytic_fg!(F, G, theta::Vector{T}) where T<:Real
 			PD = [passdata(theta, i) for i in 1:length(cl.data)]	
-			clc = pmap(clos_analytic_fg_clogit_case, pool, PD)
+			clc = pmap(clos_analytic_fg_clogit_case, pool, PD, batch_size=batch_size)
 			if G != nothing
 				G[:] = sum([y.G for y in clc])
 			end
@@ -213,17 +209,17 @@ function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, gra
 
 		function pmap_clogit_grad(beta::Vector{T}) where T<:Real
 			PD = [passdata(beta, i) for i in 1:length(cl.data)]	
-			sum(pmap(clos_grad_clogit_case, pool, PD))
+			sum(pmap(clos_grad_clogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_clogit_Hess(beta::Vector{T}) where T<:Real
 			PD = [passdata(beta, i) for i in 1:length(cl.data)]	
-			sum(pmap(clos_hessian_clogit_case, pool, PD))
+			sum(pmap(clos_hessian_clogit_case, pool, PD, batch_size=batch_size))
 		end
 
 		function pmap_clogit_fg!(F, G, beta::Vector{T}) where T<:Real
 			PD = [passdata(beta, i) for i in 1:length(cl.data)]	
-			clc = pmap(clos_fg_clogit_case, pool, PD)
+			clc = pmap(clos_fg_clogit_case, pool, PD, batch_size=batch_size)
 			if G != nothing
 				G[:] = sum([y.G for y in clc])
 			end
@@ -234,7 +230,7 @@ function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, gra
 
 		function pmap_clogit_fgh!(F, G, H, beta::Vector{T}) where T<:Real
 			PD = [passdata(beta, i) for i in 1:length(cl.data)]	
-			clc = pmap(clos_fgh_clogit_case, pool, PD)
+			clc = pmap(clos_fgh_clogit_case, pool, PD, batch_size=batch_size)
 			if H != nothing
 				H[:] = sum([y.H for y in clc])
 			end
