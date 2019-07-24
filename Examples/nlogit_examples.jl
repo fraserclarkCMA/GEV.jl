@@ -8,10 +8,10 @@
 using GEV
 
 # Additional packages for examples 
-using CSV, DataFrames, Optim, StatsModels
+using CSV, DataFrames, Optim, StatsModels, Random
 
 # cd into GEV.jl
- #= path to GEV.jl =#
+#= ; cd path to GEV.jl =#
 df = CSV.read("./Examples/Data/restaurant.csv");
 
 # ********************* ADD NESTS TO THE DATAFRAME ************************* #
@@ -41,7 +41,8 @@ nl1 = nlogit(nlm1, make_nlogit_data(nlm1, df));
 # Optimize
 Random.seed!(12345)
 opt1 = estimate_nlogit(nl1 ; opt_mode = :serial,
-							 opt_method = :grad,  
+							 opt_method = :grad,
+							 grad_type = :analytic,  
 							x_initial = randn(nl1.model.nx),
 							algorithm = LBFGS(),
 							optim_opts = Optim.Options());
@@ -69,6 +70,7 @@ nl2 = nlogit(nlm2, make_nlogit_data(nlm2, df));
 Random.seed!(12345)
 opt2 = estimate_nlogit(nl2 ; opt_mode = :serial,
 							 opt_method = :grad,  
+							 grad_type = :analytic,  
 							x_initial = rand(nl2.model.nx),
 							algorithm = LBFGS(),
 							optim_opts = Optim.Options(show_trace=true))
@@ -97,6 +99,7 @@ nl3 = nlogit(nlm3, make_nlogit_data(nlm3, df));
 Random.seed!(12345)
 opt3 = estimate_nlogit(nl3 ; opt_mode = :serial,
 							 opt_method = :grad,  
+							 grad_type = :analytic,  
 							x_initial = rand(nl3.model.nx),
 							algorithm = LBFGS(),
 							optim_opts = Optim.Options());
@@ -113,6 +116,7 @@ vcat(["Variable" "Coef." "std err"],[nl3.model.coefnames xstar3 se3])
 # Define function for any start value
 estnl(x0) = estimate_nlogit(nl3 ; opt_mode = :serial,
 							 opt_method = :grad,  
+							 grad_type = :analytic,  
 							x_initial = x0,
 							algorithm = LBFGS(),
 							optim_opts = Optim.Options())
