@@ -141,6 +141,7 @@ function vec_to_theta!(x::Vector{T}, θ::nlogit_param, flags::Dict, idx::Dict) w
 		θ.lambda[:] = x[idx[:lambda]]
 	end
 end
+vec_to_theta!(x::Vector{Float64}, model::nlogit_model) = vec_to_theta!(x, model.params, model.flags, model.idx)
 
 #  Copy nlogit parameter type into x (input to optimiser)
 function theta_to_vec!(x::Vector{T}, θ::nlogit_param, flags::Dict, idx::Dict) where T<:Real
