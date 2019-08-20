@@ -9,7 +9,7 @@ function nlogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symb
 	NX = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ? 0 : size(modelcols(f_beta , df)[2], 2)
 	NW = isa(f_alpha.rhs.terms[1], StatsModels.InterceptTerm{false}) ? 0 : size(modelcols(f_alpha , df)[2], 2) 
 	np = nlogit_param(NX, NW, num_lambda )
-	opts = Dict(:RUM=>RUM, :num_lambda=>num_lambda)
+	opts = Dict(:RUM=>RUM, :num_lambda=>num_lambda, :outside_share=>0.)
 	flags = Dict(:beta=>true, :alpha=>false, :lambda=>true)
 	idx, nx = get_vec_dict(np, flags)
 	coefnms = num_lambda>1 ? 
@@ -25,7 +25,7 @@ function nlogit_model(f_beta::StatsModels.FormulaTerm, f_alpha::StatsModels.Form
 	NX = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ? 0 : size(modelcols(f_beta , df)[2], 2)
 	NW = isa(f_alpha.rhs.terms[1], StatsModels.InterceptTerm{false}) ? 0 : size(modelcols(f_alpha , df)[2], 2) 
 	np = nlogit_param(NX, NW, num_lambda)
-	opts = Dict(:RUM=>RUM, :num_lambda=>num_lambda)
+	opts = Dict(:RUM=>RUM, :num_lambda=>num_lambda, :outside_share=>0.)
 	flags = Dict(:beta=>true, :alpha=>true, :lambda=>true)
 	idx, nx = get_vec_dict(np, flags)
 	coefnms = num_lambda>1 ? 
@@ -412,3 +412,63 @@ end
 fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlogit_case(theta, nlm.model, nl.data[id])
 
 
+function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, RUM::Bool, outside_share::Float64) where T<:Real
+	vec_to_theta!(x, θ, flags, idx)	
+	@unpack beta, alpha, lambda = θ
+
+	Nbeta = length(beta)
+	Nalpha = length(alpha)
+	Numλ = length(lambda)	
+
+	## Allocate memory
+	grad = zeros(Nbeta + Nalpha + Numλ)
+
+	denom = Vector{Real}()
+	s_jg = VV{eltype(x)}()
+	s_j = VV{eltype(x)}()
+	for nest_data in nlnd
+		@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		if Numλ > 1 
+			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
+		else 
+			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
+		end
+		V = Xj*beta /λ_k
+		push!(s_jg , multinomial(V))
+
+		if flags[:alpha]
+			W = Wk*alpha
+			push!(denom, W[1] + λ_k*logsumexp(V))	
+		else 
+			push!(denom, λ_k*logsumexp(V))	
+		end		
+	end
+	s_g = multinomial(denom)
+	for (g, nest_data) in enumerate(nlnd)
+		push!(s_j, s_jg[g].*s_g[g])
+	end
+	pr_j = eltype(x)[]
+	pr_jg = eltype(x)[]
+	for g in 1:length(s_g)
+		append!(pr_j, s_j[g])
+		append!(pr_jg, s_jg[g])
+	end
+
+	return (1.0 .- outside_share).*pr_j, pr_jg
+end
+
+nlogit_prob(x::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real = 
+	nlogit_prob(x, model.params, data, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share])
+
+nlogit_prob(x::Vector{T}, nl::nlogit, case_num::Int64) where T<:Real = nlogit_prob(x, nl.model, nl.data[case_num])
+
+function nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
+	out_j = eltype(x)[]
+	out_jg = eltype(x)[]
+	for case_data in nl.data
+		pr_j, pr_jg = nlogit_prob(x, nl.model, case_data)
+		append!(out_j, pr_j)
+		append!(out_jg, pr_jg)
+	end
+	return out_j, out_jg, out_j./out_jg
+end	

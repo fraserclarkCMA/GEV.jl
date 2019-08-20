@@ -47,6 +47,18 @@ function clogit_prob(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	return  exp.(V .- maxV) ./sum(exp.(V .- maxV))
 end
 
+function grad_clogit_prob(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
+	ForwardDiff.gradient(x->clogit_prob(x, clcd), beta)
+end
+
+function clogit_prob(beta::Vector{T}, cld::clogit_data) where T<:Real
+	s_j = eltype(beta)[]
+	for case_data in cld 
+		append!(s_j, clogit_prob(beta, case_data) )
+	end
+	s_j
+end
+
 function analytic_grad_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	@unpack jstar, dstar, Xj = clcd
 	J,K = size(Xj)

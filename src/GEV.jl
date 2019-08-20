@@ -11,6 +11,8 @@ include("clogit.jl")
 include("nlogit.jl")
 include("EstimationWrappers.jl")
 include("utils.jl")
+include("Elasticities_clogit.jl")
+include("Elasticities_nlogit.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
 	   clogit_data, clogit_case_data, make_clogit_data, 
@@ -29,6 +31,13 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   fgh_nlogit_case, 	   
 	   estimate_nlogit,
 	   logsumexp, fun_RUM, get_vec_dict, passdata, distdata,
-	   vec_to_theta!, theta_to_vec!, std_err, @formula
+	   vec_to_theta!, theta_to_vec!, std_err, @formula, multinomial,
+	   clogit_prob, grad_clogit_prob,
+	   elas_own_clogit, grad_elas_own_clogit,
+	   elas_cross_clogit, grad_elas_cross_clogit,
+	   nlogit_prob, elas_own_nlogit, grad_elas_own_nlogit,
+	   elas_within_nlogit, grad_elas_within_nlogit,
+	   elas_across_nlogit, grad_elas_across_nlogit
+	  
 
 end 
