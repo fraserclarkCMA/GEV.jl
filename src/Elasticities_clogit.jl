@@ -86,7 +86,7 @@ function grad_elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside
 	return [ForwardDiff.gradient(b->elas_cross_clogit(b , clcd, outside_share, price_indices)[j], beta) for j in 1:J]
 end
 
-function grad_elas_cross_clogit(beta::Vector{T}, cld::clogit_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_cross_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
 	∇e_kj = VV{eltype(beta)}()
 	for case_data in cld 
 		append!(∇e_kj, grad_elas_cross_clogit(beta, case_data , outside_share, price_indices) )
