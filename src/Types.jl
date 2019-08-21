@@ -27,6 +27,7 @@ function clogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symb
 	NX = size(modelcols(f_beta , df)[2], 2)
 	params = clogit_param(NX)
 	opts = Dict()
+	opts[:outside_share] = 0.
 	cfnms = coefnames(f_beta)[2]
 	return clogit_model(f_beta, params, case, choice_id, Dict(:beta => 1:NX), NX, cfnms, opts)
 end

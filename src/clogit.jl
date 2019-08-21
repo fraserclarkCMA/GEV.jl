@@ -40,25 +40,6 @@ end
 
 grad_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = grad_clogit_case(beta, cld[id]) 
 
-function clogit_prob(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
-	@unpack jstar, dstar, Xj = clcd
-	V = Xj*beta  
-	maxV = maximum(V)
-	return  exp.(V .- maxV) ./sum(exp.(V .- maxV))
-end
-
-function grad_clogit_prob(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
-	ForwardDiff.gradient(x->clogit_prob(x, clcd), beta)
-end
-
-function clogit_prob(beta::Vector{T}, cld::clogit_data) where T<:Real
-	s_j = eltype(beta)[]
-	for case_data in cld 
-		append!(s_j, clogit_prob(beta, case_data) )
-	end
-	s_j
-end
-
 function analytic_grad_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	@unpack jstar, dstar, Xj = clcd
 	J,K = size(Xj)
@@ -103,5 +84,28 @@ function fgh_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 end
 
 fgh_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = fgh_clogit_case(beta, cld[id]) 
+
+function clogit_prob(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64) where T<:Real
+	@unpack jstar, dstar, Xj = clcd
+	V = Xj*beta  
+	maxV = maximum(V)
+	return  (1.0 .- outside_share).*exp.(V .- maxV) ./sum(exp.(V .- maxV))
+end
+
+function clogit_prob(beta::Vector{T}, cld::clogit_data, outside_share::Float64) where T<:Real
+	s_j = eltype(beta)[]
+	for case_data in cld 
+		append!(s_j, clogit_prob(beta, case_data, outside_share) )
+	end
+	s_j
+end
+
+clogit_prob(beta::Vector{T}, cl::clogit) where T<:Real = clogit_prob(beta, cl.data, cl.model.opts[:outside_share])
+
+function grad_clogit_prob(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64) where T<:Real
+	ForwardDiff.gradient(x->clogit_prob(x, clcd, outside_share), beta)
+end
+
+grad_clogit_prob(beta::Vector{T}, cl::clogit) where T<:Real = grad_clogit_prob(beta, cl.data, cl.model.opts[:outside_share])
 
 
