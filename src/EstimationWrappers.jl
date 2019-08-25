@@ -342,17 +342,17 @@ function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, gra
 		dist_fgh_nlogit_case(dd::distdata) = fgh_clogit_case(dd.theta, nl.model, dd.data)
 	
 		function dist_pmap_nlogit_ll(theta::Vector{T}) where T<:Real 
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			sum(pmap(dist_ll_nlogit_case, DD, batch_size=batch_size))
 		end
 
 		function dist_pmap_nlogit_analytic_grad(theta::Vector{T}) where T<:Real
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			sum(pmap(dist_analytic_grad_clogit_case, DD, batch_size=batch_size))
 		end
 
 		function dist_pmap_nlogit_analytic_fg!(F, G, theta::Vector{T}) where T<:Real
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			nlc = pmap(dist_analytic_fg_nlogit_case, DD, batch_size=batch_size)
 			if G != nothing
 				G[:] = sum([y.G for y in nlc])
@@ -363,17 +363,17 @@ function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, gra
 		end
 
 		function dist_pmap_nlogit_grad(theta::Vector{T}) where T<:Real
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			sum(pmap(dist_grad_clogit_case, DD, batch_size=batch_size))
 		end
 
 		function dist_pmap_nlogit_Hess(theta::Vector{T}) where T<:Real
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			sum(pmap(dist_hessian_nlogit_case, DD, batch_size=batch_size))
 		end
 
 		function dist_pmap_nlogit_fg!(F, G, theta::Vector{T}) where T<:Real
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			nlc = pmap(dist_fg_nlogit_case, DD, batch_size=batch_size)
 			if G != nothing
 				G[:] = sum([y.G for y in nlc])
@@ -384,7 +384,7 @@ function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, gra
 		end
 
 		function dist_pmap_nlogit_fgh!(F, G, H, theta::Vector{T}) where T<:Real
-			DD = [distdata(beta, nld) for nld in nl.data]	
+			DD = [distdata(theta, nld) for nld in nl.data]	
 			nlc = pmap(dist_fgh_nlogit_case, DD, batch_size=batch_size)
 			if H != nothing
 				H[:] = sum([y.H for y in nlc])
