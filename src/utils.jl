@@ -20,15 +20,14 @@ function std_err(beta::Vector{T}, cl::clogit) where T<:Real
 	end
 	try
 		u,s,v = svd(OG)
-		se = sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
+		return sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
 	catch 
+		println("WARNING: used tsvd to approx se with nsv=$(nsv)")
 		sv = svdvals(OG)
 		nsv = J - sum(isapprox.(sv./sv[1],0.; atol= 1e-6))
 		u,s,v = tsvd(OG, nsv)
-		se = sqrt.(abs.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u')))
-		println("WARNING: used tsvd to approx se with nsv=$(nsv)")
+		return sqrt.(abs.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u')))		
 	end
-	return se
 end
 
 function std_err(theta::Vector{T}, nl::nlogit) where T<:Real
@@ -40,13 +39,12 @@ function std_err(theta::Vector{T}, nl::nlogit) where T<:Real
 	end
 	try
 		u,s,v = svd(OG)
-		se = sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
+		return sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
 	catch 
+		println("WARNING: used tsvd to approx se with nsv=$(nsv)")
 		sv = svdvals(OG)
 		nsv = J - sum(isapprox.(sv./sv[1],0.; atol= 1e-6))
 		u,s,v = tsvd(OG, nsv)
-		se = sqrt.(abs.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u')))
-		println("WARNING: used tsvd to approx se with nsv=$(nsv)")
+		return sqrt.(abs.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u')))		
 	end
-	return se
 end
