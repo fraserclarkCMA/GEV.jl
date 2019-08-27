@@ -18,10 +18,10 @@ function std_err(beta::Vector{T}, cl::clogit) where T<:Real
 		g = analytic_grad_clogit_case(beta, cld) 
 		OG .+= g*g'
 	end
-	if isposdef(OG)
+	try
 		u,s,v = svd(OG)
 		se = sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
-	else 
+	catch 
 		sv = svdvals(OG)
 		nsv = J - sum(isapprox.(sv./sv[1],0.; atol= 1e-6))
 		u,s,v = tsvd(OG, nsv)
@@ -38,10 +38,10 @@ function std_err(theta::Vector{T}, nl::nlogit) where T<:Real
 		g = analytic_grad_nlogit_case(theta, nl, id) 
 		OG .+= g*g'
 	end
-	if isposdef(OG)
+	try
 		u,s,v = svd(OG)
 		se = sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
-	else 
+	catch 
 		sv = svdvals(OG)
 		nsv = J - sum(isapprox.(sv./sv[1],0.; atol= 1e-6))
 		u,s,v = tsvd(OG, nsv)
