@@ -22,9 +22,9 @@ function std_err(beta::Vector{T}, cl::clogit) where T<:Real
 		u,s,v = svd(OG)
 		return sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
 	catch 
-		println("WARNING: used tsvd to approx se with nsv=$(nsv)")
 		sv = svdvals(OG)
 		nsv = J - sum(isapprox.(sv./sv[1],0.; atol= 1e-6))
+		println("WARNING: used tsvd to approx std err with nsv=$(nsv)")
 		u,s,v = tsvd(OG, nsv)
 		return sqrt.(abs.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u')))		
 	end
@@ -41,9 +41,9 @@ function std_err(theta::Vector{T}, nl::nlogit) where T<:Real
 		u,s,v = svd(OG)
 		return sqrt.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u'))
 	catch 
-		println("WARNING: used tsvd to approx se with nsv=$(nsv)")
 		sv = svdvals(OG)
 		nsv = J - sum(isapprox.(sv./sv[1],0.; atol= 1e-6))
+		println("WARNING: used tsvd to approx std err with nsv=$(nsv)")
 		u,s,v = tsvd(OG, nsv)
 		return sqrt.(abs.(LinearAlgebra.diag(v*Diagonal(1.0 ./s)*u')))		
 	end
