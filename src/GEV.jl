@@ -1,6 +1,6 @@
 module GEV
 
-using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim
+using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim, TSVD
 
 import Distributed: CachingPool, pmap, workers
 
