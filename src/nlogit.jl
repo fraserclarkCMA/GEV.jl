@@ -230,9 +230,9 @@ function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::n
 		J,K = size(Xj)
 
 		if Numλ > 1 
-			λ_k = RUM ? fun_lambda(lambda[nest_num]) : lambda[nest_num]
+			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
 		else 
-			λ_k = RUM ? fun_lambda(lambda[1]) : lambda[1]
+			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
 		end
 			
 		V = Xj*beta /λ_k 	# Jl by 1
@@ -329,9 +329,9 @@ function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlo
 		J,K = size(Xj)
 
 		if Numλ > 1 
-			λ_k = RUM ? fun_lambda(lambda[nest_num]) : lambda[nest_num]
+			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
 		else 
-			λ_k = RUM ? fun_lambda(lambda[1]) : lambda[1]
+			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
 		end
 			
 		V = Xj*beta /λ_k 	# Jl by 1
