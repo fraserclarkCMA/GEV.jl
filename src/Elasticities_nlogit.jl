@@ -6,8 +6,7 @@ function elas_own_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data,
 
 	Numλ = length(lambda)	
 
-	pr_j, pr_jg = nlogit_prob(x, θ, nlnd, flags, idx, RUM, outside_share)
-	pr_g = pr_j./pr_jg
+	pr_j, pr_jg, pr_g = nlogit_prob(x, θ, nlnd, flags, idx, RUM, outside_share)
 
 	e_jj = eltype(x)[]
 	ctr = 0
@@ -83,8 +82,7 @@ function elas_within_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_da
 
 	Numλ = length(lambda)	
 
-	pr_j, pr_jg = nlogit_prob(x, θ, nlnd, flags, idx, RUM, outside_share)
-	pr_g = pr_j./pr_jg
+	pr_j, pr_jg, pr_g = nlogit_prob(x, θ, nlnd, flags, idx, RUM, outside_share)
 
 	e_kj = eltype(x)[]
 	ctr = 0
@@ -159,7 +157,7 @@ function elas_across_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_da
 
 	Numλ = length(lambda)	
 
-	pr_j, pr_jg = nlogit_prob(x, θ, nlnd, flags, idx, RUM, outside_share)
+	pr_j, pr_jg, pr_g = nlogit_prob(x, θ, nlnd, flags, idx, RUM, outside_share)
 
 	e_kj = eltype(x)[]
 	ctr = 0

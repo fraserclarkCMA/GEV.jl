@@ -449,12 +449,15 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 	end
 	pr_j = eltype(x)[]
 	pr_jg = eltype(x)[]
-	for g in 1:length(s_g)
+	pr_g = eltype(x)[]
+	for (g, sg) in enumerate(s_g)
+		J = length(s_j[g])
 		append!(pr_j, s_j[g])
 		append!(pr_jg, s_jg[g])
+		append!(pr_g, sg*ones(J))
 	end
 
-	return (1.0 .- outside_share).*pr_j, pr_jg
+	return (1.0 .- outside_share).*pr_j, pr_jg, (1.0 .- outside_share).*pr_g
 end
 
 nlogit_prob(x::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real = 
@@ -465,10 +468,12 @@ nlogit_prob(x::Vector{T}, nl::nlogit, case_num::Int64) where T<:Real = nlogit_pr
 function nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
 	out_j = eltype(x)[]
 	out_jg = eltype(x)[]
+	out_g = eltype(x)[]
 	for case_data in nl.data
-		pr_j, pr_jg = nlogit_prob(x, nl.model, case_data)
+		pr_j, pr_jg, pr_g = nlogit_prob(x, nl.model, case_data)
 		append!(out_j, pr_j)
 		append!(out_jg, pr_jg)
+		append!(out_g, pr_g)
 	end
-	return out_j, out_jg, out_j./out_jg
+	return out_j, out_jg, out_g
 end	
