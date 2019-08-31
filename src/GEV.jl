@@ -37,7 +37,8 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_cross_clogit, grad_elas_cross_clogit,
 	   nlogit_prob, elas_own_nlogit, grad_elas_own_nlogit,
 	   elas_within_nlogit, grad_elas_within_nlogit,
-	   elas_across_nlogit, grad_elas_across_nlogit
+	   elas_across_nlogit, grad_elas_across_nlogit,
+	   TS1, TS2
 	  
 
 end 
