@@ -50,4 +50,4 @@ function std_err(theta::Vector{T}, nl::nlogit) where T<:Real
 end
 
 TS1(Qk) = 1.0 / (1 - Qk)
-TS2(Qk) = 4.0 / (3.0*(1-Qk) - sqrt( (1.0 + 7*Qk)*(1.0 - Qk) ) )
+TS2(Qk) = 4.0 / (3.0*(1-Qk) + sqrt( (1.0 + 7*Qk)*(1.0 - Qk) ) )
