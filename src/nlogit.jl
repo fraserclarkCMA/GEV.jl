@@ -54,7 +54,8 @@ function make_nlogit_data(model::nlogit_model, df::DataFrame)
 			end
 			Xj = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ?  Matrix{Float64}(undef, 0, 0) : modelcols(f_beta , nestdf)[2]
 			Wk = isa(f_alpha.rhs.terms[1], StatsModels.InterceptTerm{false}) ? Matrix{Float64}(undef, 0, 0) : modelcols(f_alpha , nestdf)[2] 
-			push!(casedata, nlogit_nest_data(jstar, dstar, nest_star, nestnum, Xj, Wk ))
+			groupid = nestdf[1, case_id][1]
+			push!(casedata, nlogit_nest_data(groupid, nestdf[choice_id][:], jstar, dstar, nest_star, nestnum, Xj, Wk ))
 		end
 		push!(dataset, casedata)
 	end
@@ -124,7 +125,7 @@ function ll_nlogit(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, flags::Dict
 	for case_data in nld 
 		denom = Vector{Real}()
 		for nest_data in case_data
-			@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+			@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 			if Numλ > 1 
 				λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
 			else 
@@ -163,7 +164,7 @@ function ll_nlogit_case(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, 
 	LL = 0.
 	D = Vector{Real}()
 	for nest_data in nlnd
-		@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 		if Numλ > 1 
 			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
 		else 
@@ -225,7 +226,7 @@ function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::n
 	## Compute gradient loop over nest first, then construct across nest components of ll afterwards
 	for nest_data in data
 
-		@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 
 		J,K = size(Xj)
 
@@ -324,7 +325,7 @@ function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlo
 	## Compute gradient loop over nest first, then construct across nest components of ll afterwards
 	for nest_data in data
 
-		@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 
 		J,K = size(Xj)
 
@@ -412,7 +413,8 @@ end
 fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlogit_case(theta, nlm.model, nl.data[id])
 
 
-function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, RUM::Bool, outside_share::Float64) where T<:Real
+function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, 
+		RUM::Bool, outside_share::Float64, case_id::Symbol, nest_id::Symbol, choice_id::Symbol) where T<:Real
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -427,7 +429,7 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 	s_jg = VV{eltype(x)}()
 	s_j = VV{eltype(x)}()
 	for nest_data in nlnd
-		@unpack jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 		if Numλ > 1 
 			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
 		else 
@@ -435,7 +437,6 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 		end
 		V = Xj*beta /λ_k
 		push!(s_jg , multinomial(V))
-
 		if flags[:alpha]
 			W = Wk*alpha
 			push!(denom, W[1] + λ_k*logsumexp(V))	
@@ -444,36 +445,38 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 		end		
 	end
 	s_g = multinomial(denom)
+	DF = DataFrame[]
 	for (g, nest_data) in enumerate(nlnd)
-		push!(s_j, s_jg[g].*s_g[g])
-	end
-	pr_j = eltype(x)[]
-	pr_jg = eltype(x)[]
-	pr_g = eltype(x)[]
-	for (g, sg) in enumerate(s_g)
-		J = length(s_j[g])
-		append!(pr_j, s_j[g])
-		append!(pr_jg, s_jg[g])
-		append!(pr_g, sg*ones(J))
+		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
+		J = length(jid)
+		case = case_num*ones(J)
+		nst = nest_num*ones(J)
+		sj = (1.0 .- outside_share).*s_jg[g].*s_g[g]
+		sg = (1.0 .- outside_share).*s_g[g].*ones(J)
+		push!(DF, DataFrame(case_id => case, nest_id => nst, choice_id => jid, :pr_j => sj, :pr_jg => s_jg[g], :pr_g => sg))
+ 	end
+
+ 	outdf = deepcopy(DF[1])
+	@inbounds for n in 2:length(DF)
+		append!(outdf, DF[n])
 	end
 
-	return (1.0 .- outside_share).*pr_j, pr_jg, (1.0 .- outside_share).*pr_g
+	return outdf
 end
 
 nlogit_prob(x::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real = 
-	nlogit_prob(x, model.params, data, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share])
+	nlogit_prob(x, model.params, data, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id)
 
 nlogit_prob(x::Vector{T}, nl::nlogit, case_num::Int64) where T<:Real = nlogit_prob(x, nl.model, nl.data[case_num])
 
 function nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
-	out_j = eltype(x)[]
-	out_jg = eltype(x)[]
-	out_g = eltype(x)[]
+	DF = DataFrame[]
 	for case_data in nl.data
-		pr_j, pr_jg, pr_g = nlogit_prob(x, nl.model, case_data)
-		append!(out_j, pr_j)
-		append!(out_jg, pr_jg)
-		append!(out_g, pr_g)
+		push!(DF, nlogit_prob(x, nl.model, case_data))
 	end
-	return out_j, out_jg, out_g
+	outdf = deepcopy(DF[1])
+	@inbounds for n in 2:length(DF)
+		append!(outdf, DF[n])
+	end
+	return outdf
 end	

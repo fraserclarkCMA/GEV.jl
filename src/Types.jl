@@ -82,6 +82,8 @@ nlogit_param(NX::Int64,NW::Int64,NN::Int64) where T<:Real = nlogit_param(zeros(F
 end
 
 struct nlogit_nest_data
+	case_num 	:: Int64 				# Choice Group id
+	jid 		:: Vector 				# Choice identifier
 	jstar 		:: Int64 				# Position of chosen option in chosen nest in the data
 	dstar 		:: Union{Int64,String}	# Identifier of chosen option 
 	nest_star	:: Int64 				# Chosen nest 
