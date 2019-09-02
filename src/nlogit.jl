@@ -449,8 +449,8 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 	for (g, nest_data) in enumerate(nlnd)
 		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 		J = length(jid)
-		case = case_num*ones(J)
-		nst = nest_num*ones(J)
+		case = case_num*ones(Int64,J)
+		nst = nest_num*ones(Int64,J)
 		sj = (1.0 .- outside_share).*s_jg[g].*s_g[g]
 		sg = (1.0 .- outside_share).*s_g[g].*ones(J)
 		push!(DF, DataFrame(case_id => case, nest_id => nst, choice_id => jid, :pr_j => sj, :pr_jg => s_jg[g], :pr_g => sg))

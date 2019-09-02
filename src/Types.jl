@@ -33,6 +33,8 @@ function clogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symb
 end
 
 struct clogit_case_data
+	case_num 	:: Int64 				# Choice Group id
+	jid 		:: Vector 				# Choice identifier
 	jstar 		:: Int64 				# Position of chosen option in chosen nest in the data
 	dstar 		:: Union{Int64,String}	# Identifier of chosen option 
 	Xj			:: Matrix{Float64}		# Matrix of regressors for within-nest

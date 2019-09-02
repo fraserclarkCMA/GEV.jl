@@ -60,15 +60,7 @@ function elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, pr
 	end
 	return outdf
 end	
-#=
-function elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
-	e_jj = eltype(x)[]
-	for case_data in nld
-		append!(e_jj, elas_own_nlogit(x, model, case_data, price_indices) )
-	end
-	return e_jj
-end	
-=#
+
 elas_own_nlogit(x::Vector{T}, nl::nlogit, price_indices::Vector{Int64}) where T<:Real = elas_own_nlogit(x, nl.model, nl.data, price_indices)
 
 # Gradient

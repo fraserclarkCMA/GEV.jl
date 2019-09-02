@@ -61,7 +61,19 @@ vcat(["Variable" "Coef." "std err"],[nl1.model.coefnames xstar1 se1])
 # Purchase Probabilities
 nl1.model.opts[:outside_share] = 0.5
 prob_df = nlogit_prob(xstar1, nl1);
-df = join(df, prob_df, on=[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id])
+prob_df = join(prob_df, nestframe, on=nl1.model.nest_id )
+df = join(df, prob_df, on=[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id], kind=:left; makeunique=true);
+
+# Check RUM 
+prob_df[:TS1] = TS1.(prob_df[:pr_g]);
+prob_df[:TS2] = TS2.(prob_df[:pr_g]);
+RUMtest = by(prob_df, 
+	[:nestid, nl1.model.nest_id], 
+	[:TS1, :TS2] =>
+		x->(TS1 = minimum(x.TS1), TS2 = minimum(x.TS2)));
+RUMtest[:lambda] = nl1.model.params.lambda[RUMtest[nl1.model.nest_id]];
+RUMtest[:isRUM] = RUMtest[:lambda] .< RUMtest[:TS2];
+RUMtest
 
 # Elasticities for cost (note RUM 0<λg<1 doesn't hold... but check formats)
 price_indices = [1]
@@ -118,7 +130,7 @@ opt2 = estimate_nlogit(nl2 ; opt_mode = :serial,
 							 opt_method = :grad,  
 							 grad_type = :analytic,  
 							x_initial = rand(nl2.model.nx),
-							algorithm = LBFGS(),
+							algorithm = BFGS(),
 							optim_opts = Optim.Options(show_trace=true))
 
 # Output
@@ -147,7 +159,7 @@ opt3 = estimate_nlogit(nl3 ; opt_mode = :serial,
 							 opt_method = :grad,  
 							 grad_type = :analytic,  
 							x_initial = rand(nl3.model.nx),
-							algorithm = LBFGS(),
+							algorithm = BFGS(),
 							optim_opts = Optim.Options());
 # Output
 xstar3 = Optim.minimizer(opt3);

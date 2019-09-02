@@ -32,7 +32,7 @@ result = estimate_clogit(cl ; opt_mode = :serial,
 							 opt_method = :grad,
 							 grad_type = :analytic,  
 							x_initial = randn(cl.model.nx),
-							algorithm = LBFGS(),
+							algorithm = BFGS(),
 							optim_opts = Optim.Options());
 
 # Optimal parameter value
@@ -47,13 +47,18 @@ vcat(["Variable" "Coef." "std err"], [cl.model.coefnames xstar se])
 
 # Calculate predicted purchase probabilities
 cl.model.opts[:outside_good] = 0.9;
-df[:s_j] = clogit_prob(xstar, cl);
+prob_df = clogit_prob(xstar, cl);
+df = join(df, prob_df, on=[cl.model.case_id, cl.model.choice_id], kind=:left);
 
 # Calculate elasticities: own, cross
 price_vars = [1];
-df[:e_jj] = elas_own_clogit(xstar, cl, price_vars);
-df[:e_kj] = elas_cross_clogit(xstar, cl, price_vars);
+ejj = elas_own_clogit(xstar, cl, price_vars);
+ekj = elas_cross_clogit(xstar, cl, price_vars);
+elasdf = ejj;
+elasdf = join(elasdf, ekj, on=[cl.model.case_id, cl.model.choice_id], kind=:left);
+df = join(df, elasdf, on=[cl.model.case_id, cl.model.choice_id], kind=:left);
 
+#=
 ∇e_jj = grad_elas_own_clogit(xstar, cl, price_vars);
 ∇e_kj = grad_elas_cross_clogit(xstar, cl, price_vars);
-
+=#

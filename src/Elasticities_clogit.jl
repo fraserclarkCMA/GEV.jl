@@ -1,8 +1,9 @@
 
 # clogit elasticities 
 
-function elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
-	@unpack jstar, dstar, Xj = clcd
+function elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, 
+							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+	@unpack case_num, jid, jstar, dstar, Xj = clcd
 	
 	# Step 1: get price terms
 	J = size(Xj,1)
@@ -15,42 +16,51 @@ function elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share:
 	V = Xj*beta
 	pr_j = (1.0 .- outside_share).*multinomial(V)
 
-	return alpha_x_price.*(1.0 .- pr_j)
+	return DataFrame(case_id=>case_num.*ones(J), choice_id=>jid, :ejj=>alpha_x_price.*(1.0 .- pr_j)) 
 end
 
-function elas_own_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
-	e_jj = eltype(beta)[]
-	for case_data in cld 
-		append!(e_jj, elas_own_clogit(beta, case_data , outside_share, price_indices) )
+function elas_own_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, 
+							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+	
+	EDF = DataFrame[]
+	for case_data in cld
+		push!(EDF, elas_own_clogit(beta, case_data , outside_share, case_id, choice_id, price_indices))
 	end
-	e_jj
+	outdf = deepcopy(EDF[1])
+	@inbounds for n in 2:length(EDF)
+		append!(outdf, EDF[n])
+	end
+	return outdf
 end
 
 elas_own_clogit(beta::Vector{T}, cl::clogit, price_indices::Vector{Int64}) where T<:Real = 
-	elas_own_clogit(beta, cl.data, cl.model.opts[:outside_share], price_indices)
-
-function grad_elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
-	@unpack jstar, dstar, Xj = clcd
+	elas_own_clogit(beta, cl.data, cl.model.opts[:outside_share], cl.model.case_id, cl.model.choice_id, price_indices)
+#=
+function grad_elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, 
+							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+	@unpack case_num, jid, jstar, dstar, Xj = clcd
 	J = size(Xj,1)
-	return [ForwardDiff.gradient(b->elas_own_clogit(b , clcd, outside_share, price_indices)[j], beta) for j in 1:J]
+	return [ForwardDiff.gradient(b->elas_own_clogit(b , clcd, outside_share, case_id, choice_id, price_indices)[j], beta) for j in 1:J]
 end
 
-function grad_elas_own_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_own_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, 
+							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
 	∇e_jj = VV{eltype(beta)}()
 	for case_data in cld 
-		append!(∇e_jj, grad_elas_own_clogit(beta, case_data , outside_share, price_indices) )
+		append!(∇e_jj, grad_elas_own_clogit(beta, case_data , outside_share, case_id, choice_id, price_indices) )
 	end
 	∇e_jj
 end
 
 grad_elas_own_clogit(beta::Vector{T}, cl::clogit, price_indices::Vector{Int64}) where T<:Real = 
-	grad_elas_own_clogit(beta, cl.data, cl.model.opts[:outside_share], price_indices)
-
+	grad_elas_own_clogit(beta, cl.data, cl.model.opts[:outside_share], cl.model.case_id, cl.model.choice_id, price_indices)
+=#
 
 #= Cross price Elasticities =#
 
-function elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
-	@unpack jstar, dstar, Xj = clcd
+function elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64,
+							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+	@unpack case_num, jid, jstar, dstar, Xj = clcd
 	
 	# Step 1: get price terms
 	J = size(Xj,1)
@@ -63,35 +73,43 @@ function elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_shar
 	V = Xj*beta
 	pr_j = (1.0 .- outside_share).*multinomial(V)
 
-	return -alpha_x_price.*pr_j
+	return DataFrame(case_id=>case_num.*ones(J), choice_id=>jid, :ekj=>-alpha_x_price.*pr_j) 
 end
 
-function elas_cross_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
-	e_kj = eltype(beta)[]
-	for case_data in cld 
-		append!(e_kj, elas_cross_clogit(beta, case_data , outside_share, price_indices) )
+function elas_cross_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, 
+								case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+	
+	EDF = DataFrame[]
+	for case_data in cld
+		push!(EDF, elas_cross_clogit(beta, case_data , outside_share, case_id, choice_id, price_indices))
 	end
-	e_kj
+	outdf = deepcopy(EDF[1])
+	@inbounds for n in 2:length(EDF)
+		append!(outdf, EDF[n])
+	end
+	return outdf
 end
 
 elas_cross_clogit(beta::Vector{T}, cl::clogit, price_indices::Vector{Int64}) where T<:Real = 
-	elas_cross_clogit(beta, cl.data, cl.model.opts[:outside_share], price_indices)
+	elas_cross_clogit(beta, cl.data, cl.model.opts[:outside_share], cl.model.case_id, cl.model.choice_id, price_indices)
 
-
-function grad_elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
-	@unpack jstar, dstar, Xj = clcd
+#=
+function grad_elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, 
+								case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+	@unpack case_num, jid, jstar, dstar, Xj = clcd
 	J = size(Xj,1)
-	return [ForwardDiff.gradient(b->elas_cross_clogit(b , clcd, outside_share, price_indices)[j], beta) for j in 1:J]
+	return [ForwardDiff.gradient(b->elas_cross_clogit(b , clcd, outside_share, case_id, choice_id, price_indices)[j], beta) for j in 1:J]
 end
 
-function grad_elas_cross_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_cross_clogit(beta::Vector{T}, cld::clogit_data, outside_share::Float64, 
+								case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
 	∇e_kj = VV{eltype(beta)}()
 	for case_data in cld 
-		append!(∇e_kj, grad_elas_cross_clogit(beta, case_data , outside_share, price_indices) )
+		append!(∇e_kj, grad_elas_cross_clogit(beta, case_data , outside_share, case_id, choice_id, price_indices) )
 	end
 	∇e_kj
 end
 
 grad_elas_cross_clogit(beta::Vector{T}, cl::clogit, price_indices::Vector{Int64}) where T<:Real = 
-	grad_elas_cross_clogit(beta, cl.data, cl.model.opts[:outside_share], price_indices)
-
+	grad_elas_cross_clogit(beta, cl.data, cl.model.opts[:outside_share], cl.model.case_id, cl.model.choice_id, price_indices)
+=#
