@@ -2,10 +2,17 @@
 
 using Distributed
 addprocs(2)
-@everywhere push!(LOAD_PATH, "./Git")
-@everywhere using GEV
+@everywhere begin 
+	push!(LOAD_PATH, "./Git")
+	using GEV
+	; cd Git/GEV.jl
+	using Pkg
+	Pkg.activate(".")
+	Pkg.instantiate()
+end 
 
 using CSV, DataFrames, StatsModels, Optim, LinearAlgebra
+; cd Git/GEV.jl
 df = CSV.read("./Examples/Data/restaurant.csv");
 
 # clogit formula
@@ -18,22 +25,13 @@ clm = clogit_model(f1, df ; case=:family_id, choice_id=:restaurant)
 cl = clogit( clm, make_clogit_data(clm, df));
 
 # Option 1. Estimate clogit model with LBFGS() or other algorithm only requiring gradients
-result = estimate_clogit(cl; opt_mode = :shared_parallel, 	# <- Need to call :parallel here
+result = estimate_clogit(cl; opt_mode = :parallel, 	# <- Need to call :parallel here
 							 opt_method = :grad,  	# <- :grad or :hess , linked to algorithm
 							x_initial = randn(cl.model.nx),
 							algorithm = LBFGS(), 	# <- algorithm
 							optim_opts = Optim.Options(show_trace=true), # <- optim options
 							batch_size = 50, 		# <- Specify batch size per parallel iteration
 							workers = workers());   # <- Can put subset of workers i.e. [2]
-
-# Can also distribute (additional overhead - maybe useful very many choice occasions, many workers and limited memory) 
-result = estimate_clogit(cl; opt_mode = :dist_parallel,
-							 opt_method = :grad,  
-							x_initial = randn(cl.model.nx),
-							algorithm = LBFGS(),
-							optim_opts = Optim.Options(show_trace=true),
-							batch_size = 50,
-							workers=[2,3]);
 
 # Option 2. Estimate clogit model with Newton() or other method requiring Hessian
 result = estimate_clogit(cl; opt_mode = :parallel,

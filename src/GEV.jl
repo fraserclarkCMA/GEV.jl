@@ -2,14 +2,15 @@ module GEV
 
 using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim, TSVD
 
-import Distributed: CachingPool, pmap, workers
+using Distributed
 
 VV{T} = Vector{Vector{T}}
 
 include("Types.jl")
 include("clogit.jl")
 include("nlogit.jl")
-include("EstimationWrappers.jl")
+include("Estimation_clogit.jl")
+include("Estimation_nlogit.jl")
 include("utils.jl")
 include("Elasticities_clogit.jl")
 include("Elasticities_nlogit.jl")
