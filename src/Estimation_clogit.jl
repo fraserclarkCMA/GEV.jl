@@ -1,11 +1,10 @@
 # Wrapper for Estimation
 function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, grad_type = :analytic,
-						x_initial = randn(cl.model.nx), algorithm = LBFGS(), batch_size = 1, 
-						optim_opts = Optim.Options(), workers=workers())
+						x_initial = randn(cl.model.nx), algorithm = LBFGS(), batch_size = 1, optim_opts = Optim.Options())
 
 	if opt_mode == :parallel 
 
-		out = estimate_clogit_parallel(cl, opt_method, grad_type, x_initial, algorithm, batch_size, optim_opts, workers)
+		out = estimate_clogit_parallel(cl, opt_method, grad_type, x_initial, algorithm, batch_size, optim_opts)
 
 	else
 
@@ -19,7 +18,7 @@ end
 
 
 function estimate_clogit_parallel(cl::clogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64},
-										 algorithm, batch_size::Int64, optim_opts, workers::Vector{Int64})
+										 algorithm, batch_size::Int64, optim_opts)
 
 	# Step 1: Copy the data to Main.cl_data on all workers
 	printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
@@ -28,13 +27,13 @@ function estimate_clogit_parallel(cl::clogit, opt_method::Symbol, grad_type::Sym
 
 	# Define functions on all workers using Main.clodgit_data
 	@everywhere begin
-		ll_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_clogit_case(beta, Main.cl_data[id])
-		grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_clogit_case(beta, Main.cl_data[id]) 
-		analytic_grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_clogit_case(beta, Main.cl_data[id]) 
-		hessian_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_clogit_case(beta, Main.cl_data[id]) 
-		fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_clogit_case(beta, Main.cl_data[id]) 
-		analytic_fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_clogit_case(beta, Main.cl_data[id]) 
-		fgh_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_clogit_case(beta, Main.cl_data[id]) 
+		ll_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.ll_clogit_case(beta, Main.cl_data[id])
+		grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.grad_clogit_case(beta, Main.cl_data[id]) 
+		analytic_grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.analytic_grad_clogit_case(beta, Main.cl_data[id]) 
+		hessian_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.hessian_clogit_case(beta, Main.cl_data[id]) 
+		fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.fg_clogit_case(beta, Main.cl_data[id]) 
+		analytic_fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.analytic_fg_clogit_case(beta, Main.cl_data[id]) 
+		fgh_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.fgh_clogit_case(beta, Main.cl_data[id]) 
 	end
 
 	# Define vector 
