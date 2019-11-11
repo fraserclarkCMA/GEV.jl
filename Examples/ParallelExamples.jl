@@ -1,18 +1,26 @@
 # ****** Do a parallel version of clogit example ************* #
 
-# julia10 --project=./Git/GEV --depwarn=no
+# Start julia with flags `--project=[path_to_GEV]` 
 
+
+#* Option 1 - This works on Mac OSX & Linux *#
 using Distributed
-addprocs(2; exeflags="--project=./Git/GEV" )    #= This activates the project environment on startup (i.e. ] -> (GEV) pkg)  prompt)  =#
 
+#* This activates the project environment on startup (i.e. ] -> (GEV) pkg)  prompt)
+addprocs(6; exeflags="--project=./Git/GEV" )    
 @everywhere push!(LOAD_PATH, "./Git")
 @everywhere using Pkg
-@everywhere cd("./Git/GEV")
-@everywhere Pkg.activate(".")
-@everywhere Pkg.instantiate()
-@everywhere using GEV
- 
 
+if Sys.islinux()
+	# Avoid Git locking by doing in sequence when calling from same local drive
+	for w in workers()
+		remotecall_fetch(()->Pkg.instantiate(), w)
+	end
+else 
+	@everywhere Pkg.instantiate()
+end 
+
+@everywhere using GEV
 using CSV, DataFrames, StatsModels, Optim, LinearAlgebra
 #=
 cd(@__DIR__)
@@ -31,7 +39,7 @@ cl = clogit( clm, make_clogit_data(clm, df));
 
 # Option 1. Estimate clogit model with LBFGS() or other algorithm only requiring gradients
 result = estimate_clogit(cl; opt_mode = :parallel, 	# <- Need to call :parallel here
-							 opt_method = :gradientfree,  	# <- :grad or :hess , linked to algorithm
+							 opt_method = :grad,  	# <- :grad or :hess , linked to algorithm
 							x_initial = randn(cl.model.nx),
 							algorithm = LBFGS(), 	# <- algorithm
 							optim_opts = Optim.Options(show_trace=true), # <- optim options
@@ -46,7 +54,7 @@ coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 
 # Option 2. Estimate clogit model with LBFGS() or other algorithm only requiring gradients
 result = estimate_clogit(cl; opt_mode = :parallel, 	# <- Need to call :parallel here
-							 opt_method = :grad,  	# <- :grad or :hess , linked to algorithm
+							 opt_method = :grad,  	# <- :grad or :hess - anything else will default to numerical gradient
 							x_initial = randn(cl.model.nx),
 							algorithm = LBFGS(), 	# <- algorithm
 							optim_opts = Optim.Options(show_trace=true), # <- optim options
@@ -58,7 +66,7 @@ xstar = Optim.minimizer(result);
 se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
 coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 
-# Option 3. Estimate clogit model with Newton() or other method requiring Hessian
+# Option 2. Estimate clogit model with Newton() or other method requiring Hessian
 result = estimate_clogit(cl; opt_mode = :parallel,
 							 opt_method = :hess,  
 							x_initial = randn(cl.model.nx),
