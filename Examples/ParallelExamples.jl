@@ -1,14 +1,17 @@
 # ****** Do a parallel version of clogit example ************* #
 
-using Distributed
-addprocs(1; exeflags="--project=./Git/GEV")    #= This activates the project environment on startup (i.e. ] -> (GEV) pkg)  prompt)  =#
+# julia10 --project=./Git/GEV --depwarn=no
 
-@everywhere begin 
-	push!(LOAD_PATH, "./Git")
-	using Pkg
-	Pkg.instantiate()
-	using GEV
-end 
+using Distributed
+addprocs(2; exeflags="--project=./Git/GEV" )    #= This activates the project environment on startup (i.e. ] -> (GEV) pkg)  prompt)  =#
+
+@everywhere push!(LOAD_PATH, "./Git")
+@everywhere using Pkg
+@everywhere cd("./Git/GEV")
+@everywhere Pkg.activate(".")
+@everywhere Pkg.instantiate()
+@everywhere using GEV
+ 
 
 using CSV, DataFrames, StatsModels, Optim, LinearAlgebra
 #=

@@ -398,7 +398,7 @@ analytic_fg_nlogit_case(x::Vector{Float64}, nl::nlogit, id::Int64) = analytic_fg
 function hessian_nlogit_case(theta::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real
 	ForwardDiff.hessian(x->ll_nlogit_case(x,model, data), theta)
 end
-hessian_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = hessian_nlogit_case(theta, nlm.model, nl.data[id])
+hessian_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = hessian_nlogit_case(theta, nl.model, nl.data[id])
 
 function pmap_hessian_nlogit(theta::Vector{T}, data::nlogit_data; batch_size = 1) where T<:Real
 	DD = [distdata(theta, nld) for nld in data]	
@@ -410,7 +410,7 @@ function fgh_nlogit_case(theta::Vector{T}, model::nlogit_model, data::nlogit_cas
 	nlogit_case(ll_nlogit_case(theta, model, data), grad_nlogit_case(theta, model, data), hessian_nlogit_case(theta, model, data)) 
 end
 
-fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlogit_case(theta, nlm.model, nl.data[id])
+fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlogit_case(theta, nl.model, nl.data[id])
 
 
 function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, 
@@ -480,3 +480,4 @@ function nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
 	end
 	return outdf
 end	
+

@@ -35,14 +35,12 @@ function ll_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 end
 
 ll_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = ll_clogit_case(beta, cld[id]) 
-ll_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_clogit_case(beta, Main.cl.data[id])
 
 function grad_clogit_case(beta::Vector{T}, clcd::clogit_case_data; useAD::Bool=false) where T<:Real
 	ForwardDiff.gradient(x->ll_clogit_case(x, clcd), beta)
 end
 
 grad_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = grad_clogit_case(beta, cld[id]) 
-grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_clogit_case(beta, Main.cl.data[id]) 
 
 function analytic_grad_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	@unpack case_num, jid, jstar, dstar, Xj = clcd
@@ -55,14 +53,12 @@ function analytic_grad_clogit_case(beta::Vector{T}, clcd::clogit_case_data) wher
 end
 
 analytic_grad_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = analytic_grad_clogit_case(beta, cld[id]) 
-analytic_grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_clogit_case(beta, Main.cl.data[id]) 
 
 function fg_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	clogit_case(ll_clogit_case(beta, clcd), grad_clogit_case(beta, clcd), Matrix{T}(undef,0,0)) 
 end
 
 fg_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = fg_clogit_case(beta, cld[id]) 
-fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_clogit_case(beta, Main.cl.data[id]) 
 
 function analytic_fg_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	@unpack case_num, jid, jstar, dstar, Xj = clcd
@@ -77,13 +73,11 @@ function analytic_fg_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where 
 end
 
 analytic_fg_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = analytic_fg_clogit_case(beta, cld[id]) 
-analytic_fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_clogit_case(beta, Main.cl.data[id]) 
 
 function hessian_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 	ForwardDiff.hessian(x->ll_clogit_case(x, clcd), beta)
 end
 hessian_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = hessian_clogit_case(beta, cld[id]) 
-hessian_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_clogit_case(beta, Main.cl.data[id]) 
 hessian_clogit_case(dd::distdata) = hessian_clogit_case(dd.theta, dd.data)
 
 function pmap_hessian_clogit(beta::Vector{T}, data::clogit_data; batch_size = 1) where T<:Real
@@ -96,7 +90,6 @@ function fgh_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
 end
 
 fgh_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = fgh_clogit_case(beta, cld[id]) 
-fgh_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_clogit_case(beta, Main.cl.data[id]) 
 
 
 function clogit_prob(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, case_id::Symbol, choice_id::Symbol) where T<:Real

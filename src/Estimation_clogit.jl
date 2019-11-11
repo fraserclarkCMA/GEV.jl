@@ -16,13 +16,23 @@ function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, gra
 
 end 
 
+# Wrappers for Estimation assuming nl -> Main.nl on worker - useful in Parallel 
+# Note caching pool unique to pmap call, i want multiple pmap calls so this should be more efficient despite global
+ll_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_clogit_case(beta, Main.cl.data[id])
+grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_clogit_case(beta, Main.cl.data[id]) 
+hessian_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_clogit_case(beta, Main.cl.data[id]) 
+analytic_grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_clogit_case(beta, Main.cl.data[id]) 
+fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_clogit_case(beta, Main.cl.data[id]) 
+analytic_fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_clogit_case(beta, Main.cl.data[id]) 
+fgh_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_clogit_case(beta, Main.cl.data[id]) 
+
 function estimate_clogit_parallel(cl::clogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64},
 										 algorithm, batch_size::Int64, optim_opts)
 
 	
 	# Step 1: Copy the data to Main.cl_data on all workers
 	printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
-	@everywhere cl_data = $(deepcopy(cl.data))
+	@everywhere cl = $(deepcopy(cl))
 	printstyled("Transfer of data to workers compelete\n"; bold=true, color=:blue)
 	
 	# Step 2: Setup
@@ -92,14 +102,6 @@ function estimate_clogit_parallel(cl::clogit, opt_method::Symbol, grad_type::Sym
 end
 
 function estimate_clogit_serial(cl::clogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64}, algorithm, optim_opts)
-
-	ll_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_clogit_case(beta, cl.data[id])
-	grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_clogit_case(beta, cl.data[id]) 
-	analytic_grad_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_clogit_case(beta, cl.data[id]) 
-	hessian_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_clogit_case(beta, cl.data[id]) 
-	fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_clogit_case(beta,cl.data[id]) 
-	analytic_fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_clogit_case(beta,cl.data[id]) 
-	fgh_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_clogit_case(beta, cl.data[id]) 
 
 	# Define vector 
 	NUMOBS = length(cl.data)

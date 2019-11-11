@@ -4,11 +4,11 @@ function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, gra
 
 	if opt_mode == :parallel 
 
-		out = estimate_clogit_parallel(nl, opt_method, grad_type, x_initial, algorithm, batch_size, optim_opts)
+		out = estimate_nlogit_parallel(nl, opt_method, grad_type, x_initial, algorithm, batch_size, optim_opts)
 
 	else
 
-		out = estimate_clogit_serial(nl, opt_method, grad_type, x_initial, algorithm , optim_opts)
+		out = estimate_nlogit_serial(nl, opt_method, grad_type, x_initial, algorithm , optim_opts)
 
 	end 
 
@@ -16,27 +16,24 @@ function estimate_nlogit(nl::nlogit; opt_mode = :serial, opt_method = :none, gra
 
 end 
 
+# Wrappers for Estimation assuming nl -> Main.nl on worker - useful in Parallel 
+# Note caching pool unique to pmap call, i want multiple pmap calls so this should be more efficient despite global
+ll_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_nlogit_case(beta, Main.nl.model, Main.nl.data[id])
+grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_nlogit_case(beta,Main.nl.model, Main.nl.data[id]) 
+analytic_grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_nlogit_case(beta,Main.nl.model, Main.nl.data[id]) 
+hessian_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_nlogit_case(beta, Main.nl.model, Main.nl.data[id]) 
+fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_nlogit_case(beta, Main.nl.model, Main.nl.data[id]) 
+analytic_fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_nlogit_case(beta, Main.nl.model, Main.nl.data[id]) 
+fgh_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_nlogit_case(beta, Main.nl.model, Main.nl.data[id]) 
 
 function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64}, 
 					algorithm, batch_size::Int64, optim_opts)
 
 	# Step 1: Copy the data to Main.nl_model Main.nl_data on all workers
 	printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
-	@everywhere nl_model = $(deepcopy(nl.model))
-	@everywhere nl_data = $(deepcopy(nl.data))
+	@everywhere nl = $(deepcopy(nl))
 	printstyled("Transfer of data to workers compelete\n"; bold=true, color=:blue)
 	
-	# Step 2: Define functions on all workers using Main.clogit_data
-	@everywhere begin
-		ll_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.ll_nlogit_case(beta, Main.nl_model, Main.nl_data[id])
-		grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.grad_nlogit_case(beta, Main.nl_model, Main.nl_data[id]) 
-		analytic_grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.analytic_grad_nlogit_case(beta,Main.nl_model, Main.nl_data[id]) 
-		hessian_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.hessian_nlogit_case(beta, Main.nl_model, Main.nl_data[id]) 
-		fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.fg_nlogit_case(beta, Main.nl_model, Main.nl_data[id]) 
-		analytic_fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.analytic_fg_nlogit_case(beta, Main.nl_model, Main.nl_data[id]) 
-		fgh_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = GEV.fgh_nlogit_case(beta, Main.nl_model, Main.nl_data[id]) 
-	end
-
 	# Define vector 
 	NUMOBS = length(nl.data)
 
@@ -104,14 +101,6 @@ function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Sym
 end
 
 function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64}, algorithm, optim_opts)
-
-		ll_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_nlogit_case(beta, nl.model, nl.data[id])
-		grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_nlogit_case(beta, nl.model, nl.data[id]) 
-		analytic_grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_nlogit_case(beta,nl.model, nl.data[id]) 
-		hessian_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_nlogit_case(beta, nl.model, nl.data[id]) 
-		fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_nlogit_case(beta, nl.model, nl.data[id]) 
-		analytic_fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_nlogit_case(beta, nl.model, nl.data[id]) 
-		fgh_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_nlogit_case(beta, nl.model, nl.data[id]) 
 
 	# Define vector 
 	NUMOBS = length(cl.data)
