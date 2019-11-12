@@ -1,10 +1,10 @@
 # Wrapper for Estimation
 function estimate_clogit(cl::clogit; opt_mode = :serial, opt_method = :none, grad_type = :analytic,
-						x_initial = randn(cl.model.nx), algorithm = LBFGS(), batch_size = 1, optim_opts = Optim.Options())
+						x_initial = randn(cl.model.nx), algorithm = LBFGS(), batch_size = 1, optim_opts = Optim.Options(), movedata = true)
 
 	if opt_mode == :parallel 
 
-		out = estimate_clogit_parallel(cl, opt_method, grad_type, x_initial, algorithm, batch_size, optim_opts)
+		out = estimate_clogit_parallel(cl, opt_method, grad_type, x_initial, algorithm, batch_size, optim_opts, movedata)
 
 	else
 
@@ -27,14 +27,18 @@ analytic_fg_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_
 fgh_clogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_clogit_case(beta, Main.cl.data[id]) 
 
 function estimate_clogit_parallel(cl::clogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64},
-										 algorithm, batch_size::Int64, optim_opts)
+										 algorithm, batch_size::Int64, optim_opts, movedata)
 
 	
 	# Step 1: Copy the data to Main.cl_data on all workers
-	printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
-	sendto(workers(), cl = cl)
-	printstyled("Transfer of data to workers compelete\n"; bold=true, color=:blue)
-	
+	if movedata
+		printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
+		sendto(workers(), cl = cl)
+		printstyled("Transfer of data to workers compelete\n"; bold=true, color=:blue)
+	else 
+		printstyled("Warning: You should manually move data\n"; bold=true, color=:blue)
+	end
+
 	# Step 2: Setup
 	NUMOBS = length(cl.data)
 
