@@ -32,7 +32,7 @@ function estimate_clogit_parallel(cl::clogit, opt_method::Symbol, grad_type::Sym
 	
 	# Step 1: Copy the data to Main.cl_data on all workers
 	printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
-	sendto(workers(), cl = deepcopy(cl))
+	sendto(workers(), cl = cl)
 	printstyled("Transfer of data to workers compelete\n"; bold=true, color=:blue)
 	
 	# Step 2: Setup
