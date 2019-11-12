@@ -41,8 +41,8 @@ cl = clogit( clm, make_clogit_data(clm, df));
 result = estimate_clogit(cl; opt_mode = :parallel, 	# <- Need to call :parallel here
 							 opt_method = :grad,  	# <- :grad or :hess , linked to algorithm
 							x_initial = randn(cl.model.nx),
-							algorithm = LBFGS(), 	# <- algorithm
-							optim_opts = Optim.Options(show_trace=true), # <- optim options
+							algorithm = GEV.Optim.LBFGS(), 	# <- algorithm
+							optim_opts = GEV.Optim.Options(show_trace=true), # <- optim options
 							batch_size = 50);   # <- Can put subset of workers i.e. [2]
 
 # Optimal parameter value

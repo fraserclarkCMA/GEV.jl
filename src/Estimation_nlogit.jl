@@ -31,7 +31,7 @@ function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Sym
 
 	# Step 1: Copy the data to Main.nl_model Main.nl_data on all workers
 	printstyled("\nTransferring data to workers....\n"; bold=true, color=:blue)
-	@everywhere nl = $(deepcopy(nl))
+	sendto(workers(), nl = $(deepcopy(nl)))
 	printstyled("Transfer of data to workers compelete\n"; bold=true, color=:blue)
 	
 	# Define vector 
