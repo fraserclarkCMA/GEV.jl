@@ -5,15 +5,17 @@
 
 # ******************************************************** #
 
+using Pkg
+Pkg.activate("./Git/GEV")
+Pkg.instantiate()
+
 using GEV
 
 # Additional packages for examples 
 using CSV, DataFrames, Optim, StatsModels
 
 # cd into GEV.jl
-; cd Git/GEV
-#= ; cd path to GEV.jl =#
-df = CSV.read("./Examples/Data/restaurant.csv");
+df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv");
 
 # ******************************************************** #
 
@@ -38,7 +40,7 @@ result = estimate_clogit(cl ; opt_mode = :serial,
 # Optimal parameter value
 LLstar = -Optim.minimum(result);
 xstar = Optim.minimizer(result);
-se = std_err(x->ll_clogit(x,cl), Optim.minimizer(result));
+se = std_err(xstar,cl);
 coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se]);
 
 # Print out results

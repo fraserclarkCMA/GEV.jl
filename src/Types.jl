@@ -16,7 +16,7 @@ clogit_param(NX::Int64) where T<:Real = clogit_param(zeros(Float64,NX))
 	choice_id :: Symbol 		# Choice identifier variable
 	idx 	:: Dict 			# Index for parameters
 	nx 		:: Int64 			# Number of parameters 
-	coefnames :: Vector 		# Coefficient names
+	coefnames :: Any 		# Coefficient names
 	opts 	:: Dict 			# Group id var, number of different nesting parameters, nest id
 end
 
@@ -24,11 +24,14 @@ end
 
 function clogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symbol, choice_id::Symbol)
 	f_beta = StatsModels.apply_schema(f_beta, StatsModels.schema(f_beta, df))
-	NX = size(modelcols(f_beta , df)[2], 2)
+	NX = size(StatsModels.modelcols(f_beta , df)[2], 2)
 	params = clogit_param(NX)
 	opts = Dict()
 	opts[:outside_share] = 0.
-	cfnms = coefnames(f_beta)[2]
+	cfnms = StatsModels.coefnames(f_beta)[2]
+	if length(cfnms) ==1 
+		cfnms = [cfnms]
+	end
 	return clogit_model(f_beta, params, case, choice_id, Dict(:beta => 1:NX), NX, cfnms, opts)
 end
 
@@ -78,7 +81,7 @@ nlogit_param(NX::Int64,NW::Int64,NN::Int64) where T<:Real = nlogit_param(zeros(F
 	choice_id :: Symbol 		# Choice identifier variable
 	idx 	:: Dict 			# Index for parameters
 	nx 		:: Int64 			# Number of parameters 
-	coefnames :: Vector 		# Coef names
+	coefnames :: Any 		# Coef names
 	opts 	:: Dict 			# Group id var, number of different nesting parameters, nest id
 	flags	:: Dict 			# Flags indicating which of beta, alpha and tau are estimated	
 end

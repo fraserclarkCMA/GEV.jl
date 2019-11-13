@@ -105,17 +105,26 @@ function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Sym
 end
 
 function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64}, algorithm, optim_opts)
+	#=
+	ll_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_nlogit_case(beta, nl.model, nl.data[id])
+	grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_nlogit_case(beta,nl.model, nl.data[id]) 
+	analytic_grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_nlogit_case(beta,nl.model, nl.data[id]) 
+	hessian_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_nlogit_case(beta, nl.model, nl.data[id]) 
+	fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_nlogit_case(beta, nl.model, nl.data[id]) 
+	analytic_fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_nlogit_case(beta, nl.model, nl.data[id]) 
+	fgh_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_nlogit_case(beta, nl.model, nl.data[id]) 
+	=#
 
 	# Define vector 
-	NUMOBS = length(cl.data)
+	NUMOBS = length(nl.data)
 
 	# Optimisation functions for master process
-	nlogit_ll(beta::Vector{T}) where T<:Real = sum(map(m->ll_nlogit_case(beta, m), 1:NUMOBS))
+	nlogit_ll(beta::Vector{T}) where T<:Real = sum(map(m->ll_nlogit_case(beta, nl, m), 1:NUMOBS))
 
-	nlogit_analytic_grad(beta::Vector{T}) where T<:Real = sum(map(m->analytic_nlogit_case(beta, m), 1:NUMOBS))
+	nlogit_analytic_grad(beta::Vector{T}) where T<:Real = sum(map(m->analytic_nlogit_case(beta, nl, m), 1:NUMOBS))
 
 	function nlogit_analytic_fg!(F, G, beta::Vector{T}) where T<:Real
-		clc = map(m->analytic_fg_nlogit_case(beta,m), 1:NUMOBS)
+		clc = map(m->analytic_fg_nlogit_case(beta,nl,m), 1:NUMOBS)
 		if G != nothing
 			G[:] = sum([y.G for y in clc])
 		end
@@ -124,12 +133,12 @@ function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbo
 		end
 	end
 
-	nlogit_grad(beta::Vector{T}) where T<:Real = sum(map(m->grad_nlogit_case(beta,m), 1:NUMOBS))
+	nlogit_grad(beta::Vector{T}) where T<:Real = sum(map(m->grad_nlogit_case(beta,nl,m), 1:NUMOBS))
 
-	nlogit_Hess(beta::Vector{T}) where T<:Real = sum(map(m->hessian_nlogit_case(beta,m), 1:NUMOBS))
+	nlogit_Hess(beta::Vector{T}) where T<:Real = sum(map(m->hessian_nlogit_case(beta,nl,m), 1:NUMOBS))
 
 	function nlogit_fg!(F, G, beta::Vector{T}) where T<:Real
-		clc = map(m->fg_nlogit_case(beta,m), 1:NUMOBS)
+		clc = map(m->fg_nlogit_case(beta,nl,m), 1:NUMOBS)
 		if G != nothing
 			G[:] = sum([y.G for y in clc])
 		end
@@ -139,7 +148,7 @@ function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbo
 	end
 
 	function nlogit_fgh!(F, G, H, beta::Vector{T}) where T<:Real
-		clc = map(m->fgh_nlogit_case(beta, m), 1:NUMOBS)
+		clc = map(m->fgh_nlogit_case(beta,nl, m), 1:NUMOBS)
 		if H != nothing
 			H[:] = sum([y.H for y in clc])
 		end

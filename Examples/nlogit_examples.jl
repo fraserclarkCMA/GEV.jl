@@ -5,6 +5,10 @@
 
 # ******************************************************** #
 
+using Pkg
+Pkg.activate("./Git/GEV")
+Pkg.instantiate()
+
 using GEV
 
 # Additional packages for examples 

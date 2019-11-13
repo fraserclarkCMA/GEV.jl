@@ -46,7 +46,7 @@ function make_nlogit_data(model::nlogit_model, df::DataFrame)
 		dstar = casedf[j_idx, choice_id][1]
 		nest_star = casedf[j_idx, nest_id][1]
 		for nestdf in groupby(casedf, nest_id)
-			nestnum = nestdf[1,:nestnum]
+			nestnum = nestdf[1,nest_id]
 			if nestnum == nest_star
 				jstar = findall(x->x==1, nestdf[f_beta.lhs.sym])[1]
 			else
