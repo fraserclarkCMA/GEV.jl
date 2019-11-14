@@ -35,6 +35,16 @@ nest_labels = sort!(unique(df[:,[:nestnum, :nestid]]), :nestnum)[:nestid]
 
 # ********************** ESTIMATE: NL MODEL 1 ******************************* #
 
+#=
+
+# Equivalent Stata Code #
+
+webuse restaurant
+nlogitgen type = restaurant(fast: Freebirds | MamasPizza, family:  CafeEccell | LosNortenos | WingsNmore, fancy : Christophers | MadCows)
+nlogit chosen cost distance rating || type: , base(family) || restaurant:, noconst case(family_id)
+
+=#
+
 # Nested Logit - Model 1
 f1 = @formula( chosen ~ cost + distance + rating);
 nlm1 = nlogit_model(f1, df; case=:family_id, nests = :nestnum, choice_id=:restaurant, 
@@ -48,7 +58,7 @@ Random.seed!(12345)
 opt1 = estimate_nlogit(nl1 ; opt_mode = :serial,
 							 opt_method = :grad,
 							 grad_type = :analytic,  
-							x_initial = randn(nl1.model.nx),
+							x_initial = rand(nl1.model.nx),
 							algorithm = BFGS(),
 							optim_opts = Optim.Options());
 
@@ -120,6 +130,16 @@ by(elasdf,
 
 # *************************  ESTIMATE: NL MODEL 2 **************************** #
 
+#=
+
+# Equivalent Stata Code #
+
+webuse restaurant
+nlogitgen type = restaurant(fast: Freebirds | MamasPizza, family:  CafeEccell | LosNortenos | WingsNmore, fancy : Christophers | MadCows)
+nlogit chosen cost distance rating || type: income , base(family) || restaurant:, noconst case(family_id)
+
+=#
+
 # Nested Logit - Model 2 - use Newton + Hessian for this and price optimisation trace
 f2 = @formula( chosen ~ income&nestid);
 nlm2 = nlogit_model(f1, f2, df; case=:family_id, nests = :nestnum, choice_id=:family_id, 
@@ -147,6 +167,18 @@ vcat(["Variable" "Coef." "std err"],[nl2.model.coefnames xstar2 se2])
 
 
 # ****************************** ESTIMATE: NL MODEL 3 *********************************** #
+
+#=
+
+# Equivalent Stata Code #
+
+webuse restaurant
+nlogitgen type = restaurant(fast: Freebirds | MamasPizza, family:  CafeEccell | LosNortenos | WingsNmore, fancy : Christophers | MadCows)
+nlogit chosen cost distance rating || type: income kids, base(family) || restaurant:, noconst case(family_id)
+
+Note: Optim.jl finds marginally lower log-likelihood hence small differences in some coefficients. 
+
+=#
 
 # Nested Logit - Model 3
 f1 = @formula( chosen ~ cost + distance + rating);

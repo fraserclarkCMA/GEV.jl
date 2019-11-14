@@ -29,7 +29,7 @@ cl = clogit( clm, make_clogit_data(clm, df));
 result = estimate_clogit(cl; opt_mode = :serial,
                              opt_method = :grad,  
                             x_initial = randn(cl.model.nx),
-                            algorithm = LBFGS(),
+                            algorithm = Optim.LBFGS(),
                             optim_opts = Optim.Options());
 
 # Option 2. Optimise clogit model in serial using Hessian
@@ -48,6 +48,11 @@ coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 # Print out results
 println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
+
+"Variable"    "Coef."    "std err"
+ "cost"      -0.154309   0.0173858 
+ "distance"  -0.0853461  0.0437514 
+ "rating"     0.866979   0.0981221 
 ```
 
 At this early stage other usage examples are stored in the Examples folder. They replicate examples from analogous help files in Stata and show how to implement a parallel version (in case the data is very large).

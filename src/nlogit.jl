@@ -1,7 +1,7 @@
 # Two-level nested logit
 
 # Multiple dispatch to omit nest specific variable (i.e. logit + nest parameters)
-function nlogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symbol, nests::Symbol, choice_id::Symbol, RUM::Bool=true, num_lambda::Int64=1, nest_labels=levels(df[nests]))
+function nlogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symbol, nests::Symbol, choice_id::Symbol, RUM::Bool=false, num_lambda::Int64=1, nest_labels=levels(df[nests]))
 	f_alpha = @eval(@formula($(f_beta.lhs.sym) ~ 0))
 
 	f_beta = StatsModels.apply_schema(f_beta, StatsModels.schema(f_beta, df))
@@ -19,7 +19,7 @@ function nlogit_model(f_beta::StatsModels.FormulaTerm, df::DataFrame; case::Symb
 end
 
 # Multiple dispatch to include nest specific variable (i.e. logit + nest parameters)
-function nlogit_model(f_beta::StatsModels.FormulaTerm, f_alpha::StatsModels.FormulaTerm, df::DataFrame; case::Symbol, nests::Symbol, choice_id::Symbol, RUM::Bool=true, num_lambda::Int64=1, nest_labels=levels(df[nests])) 
+function nlogit_model(f_beta::StatsModels.FormulaTerm, f_alpha::StatsModels.FormulaTerm, df::DataFrame; case::Symbol, nests::Symbol, choice_id::Symbol, RUM::Bool=false, num_lambda::Int64=1, nest_labels=levels(df[nests])) 
 	f_beta = StatsModels.apply_schema(f_beta, StatsModels.schema(f_beta, df))
 	f_alpha = StatsModels.apply_schema(f_alpha, StatsModels.schema(f_alpha, df))
 	NX = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ? 0 : size(modelcols(f_beta , df)[2], 2)
@@ -61,10 +61,6 @@ function make_nlogit_data(model::nlogit_model, df::DataFrame)
 	end
 	return dataset
 end
-
-# Consider logit transform for lambda
-fun_RUM(τ::T) where T<:Real = 1.0 ./ (1.0 .+ exp.(-τ))
-fun_RUM(τ::Vector{T}) where T<:Real = 1.0 ./ (1.0 .+ exp.(-τ))
 
 # Specify using dictionary of flags which sets of parameters are being estimated -> location of each type of parameter in x (input to optimiser)
 function get_vec_dict(θ::nlogit_param, flags::Dict)
@@ -127,9 +123,9 @@ function ll_nlogit(x::Vector{T}, θ::nlogit_param, nld::nlogit_data, flags::Dict
 		for nest_data in case_data
 			@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 			if Numλ > 1 
-				λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
+				λ_k =  lambda[nest_num]
 			else 
-				λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
+				λ_k =  lambda[1]
 			end
 			V = Xj*beta /λ_k
 			if flags[:alpha]
@@ -166,9 +162,9 @@ function ll_nlogit_case(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, 
 	for nest_data in nlnd
 		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 		if Numλ > 1 
-			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
+			λ_k = lambda[nest_num]
 		else 
-			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
+			λ_k = lambda[1]
 		end
 		V = Xj*beta /λ_k
 		IV = logsumexp(V)
@@ -210,11 +206,11 @@ function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::n
 	grad = zeros(Nbeta + Nalpha + Numλ)
 
 	D = Vector{Float64}()
-	if Nbeta>1 
-		∂D_∂β = VV{Float64}()
-	else 
-		∂D_∂β = Vector{Float64}()
-	end 
+	#if Nbeta>1 
+	∂D_∂β = VV{Float64}()
+	#else 
+	#	∂D_∂β = Vector{Float64}()
+	#end 
 	if flags[:alpha] & Nalpha>1 
 		∂D_∂α =VM{Float64}()
 	else 
@@ -231,9 +227,9 @@ function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::n
 		J,K = size(Xj)
 
 		if Numλ > 1 
-			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
+			λ_k = lambda[nest_num]
 		else 
-			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
+			λ_k = lambda[1]
 		end
 			
 		V = Xj*beta /λ_k 	# Jl by 1
@@ -309,11 +305,11 @@ function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlo
 	grad = zeros(Nbeta + Nalpha + Numλ)
 
 	D = Vector{Float64}()
-	if Nbeta>1 
-		∂D_∂β = VV{Float64}()
-	else 
-		∂D_∂β = Vector{Float64}()
-	end 
+	#if Nbeta>1 
+	∂D_∂β = VV{Float64}()
+	#else 
+	#	∂D_∂β = Vector{Float64}()
+	#end 
 	if flags[:alpha] & Nalpha>1 
 		∂D_∂α =VM{Float64}()
 	else 
@@ -330,9 +326,9 @@ function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlo
 		J,K = size(Xj)
 
 		if Numλ > 1 
-			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
+			λ_k = lambda[nest_num]
 		else 
-			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
+			λ_k = lambda[1]
 		end
 			
 		V = Xj*beta /λ_k 	# Jl by 1
@@ -431,9 +427,9 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 	for nest_data in nlnd
 		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
 		if Numλ > 1 
-			λ_k = RUM ? fun_RUM(lambda[nest_num]) : lambda[nest_num]
+			λ_k = lambda[nest_num]
 		else 
-			λ_k = RUM ? fun_RUM(lambda[1]) : lambda[1]
+			λ_k = lambda[1]
 		end
 		V = Xj*beta /λ_k
 		push!(s_jg , multinomial(V))

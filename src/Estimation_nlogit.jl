@@ -88,16 +88,35 @@ function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Sym
 	end
 
 	# Step 3: Do optimisation 
-	if opt_method == :grad
-		if grad_type == :analytic
-			out = Optim.optimize(Optim.only_fg!(pmap_nlogit_analytic_fg!), x_initial, algorithm, optim_opts)
+	if nl.model.opts(RUM) #= Impose RUM on nesting parameters in 2-level model =#
+		lower = -Inf*ones(nl.model.nx)
+		upper = Inf*ones(nl.model.nx)
+		lower[nl.model.idx[:lambda]] .= 0.0 # Impose nested parameter bounds ∈ [0,1]
+		upper[nl.model.idx[:lambda]] .= 1.0 # Impose nested parameter bounds ∈ [0,1]
+		inner_optimizer = GradientDescent()
+		if opt_method == :grad
+			if grad_type == :analytic
+				out = Optim.optimize(Optim.only_fg!(pmap_nlogit_analytic_fg!), lower, upper, x_initial, Fminbox(inner_optimizer) , optim_opts)
+			else 
+				out = Optim.optimize(Optim.only_fg!(pmap_nlogit_fg!), lower, upper, x_initial, Fminbox(inner_optimizer) , optim_opts)
+			end
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(pmap_nlogit_fgh!), lower, upper, x_initial, Fminbox(inner_optimizer) , optim_opts)
 		else 
-			out = Optim.optimize(Optim.only_fg!(pmap_nlogit_fg!), x_initial, algorithm, optim_opts)
+			out = Optim.optimize(pmap_nlogit_ll, lower, upper, x_initial, Fminbox(inner_optimizer), optim_opts)
 		end
-	elseif opt_method == :hess
-		out = Optim.optimize(Optim.only_fgh!(pmap_nlogit_fgh!), x_initial, algorithm, optim_opts)
-	else 
-		out = Optim.optimize(pmap_nlogit_ll, x_initial, NelderMead(), optim_opts)
+	else
+		if opt_method == :grad
+			if grad_type == :analytic
+				out = Optim.optimize(Optim.only_fg!(pmap_nlogit_analytic_fg!), x_initial, algorithm, optim_opts)
+			else 
+				out = Optim.optimize(Optim.only_fg!(pmap_nlogit_fg!), x_initial, algorithm, optim_opts)
+			end
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(pmap_nlogit_fgh!), x_initial, algorithm, optim_opts)
+		else 
+			out = Optim.optimize(pmap_nlogit_ll, x_initial, NelderMead(), optim_opts)
+		end
 	end
 
 	return out
@@ -172,6 +191,39 @@ function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbo
 	else 
 		out = Optim.optimize(nlogit_ll, x_initial, NelderMead(), optim_opts)
 	end
+
+	# Step 3: Do optimisation 
+	if nl.model.opts[:RUM] #= Impose RUM on nesting parameters in 2-level model =#
+		lower = -Inf*ones(nl.model.nx)
+		upper = Inf*ones(nl.model.nx)
+		lower[nl.model.idx[:lambda]] .= 0.0 # Impose nested parameter bounds ∈ [0,1]
+		upper[nl.model.idx[:lambda]] .= 1.0 # Impose nested parameter bounds ∈ [0,1]
+		inner_optimizer = GradientDescent()
+		if opt_method == :grad
+			if grad_type == :analytic
+				out = Optim.optimize(Optim.only_fg!(nlogit_analytic_fg!), lower, upper, x_initial, Fminbox(inner_optimizer) , optim_opts)
+			else 
+				out = Optim.optimize(Optim.only_fg!(nlogit_fg!), lower, upper, x_initial, Fminbox(inner_optimizer) , optim_opts)
+			end
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(nlogit_fgh!), lower, upper, x_initial, Fminbox(inner_optimizer) , optim_opts)
+		else 
+			out = Optim.optimize(nlogit_ll, lower, upper, x_initial, Fminbox(inner_optimizer), optim_opts)
+		end
+	else
+		if opt_method == :grad
+			if grad_type == :analytic
+				out = Optim.optimize(Optim.only_fg!(nlogit_analytic_fg!), x_initial, algorithm, optim_opts)
+			else 
+				out = Optim.optimize(Optim.only_fg!(nlogit_fg!), x_initial, algorithm, optim_opts)
+			end
+		elseif opt_method == :hess
+			out = Optim.optimize(Optim.only_fgh!(nlogit_fgh!), x_initial, algorithm, optim_opts)
+		else 
+			out = Optim.optimize(nlogit_ll, x_initial, NelderMead(), optim_opts)
+		end
+	end
+
 
 	return out
 
