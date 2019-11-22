@@ -88,7 +88,7 @@ function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Sym
 	end
 
 	# Step 3: Do optimisation 
-	if nl.model.opts(RUM) #= Impose RUM on nesting parameters in 2-level model =#
+	if nl.model.opts[:RUM] #= Impose RUM on nesting parameters in 2-level model =#
 		lower = -Inf*ones(nl.model.nx)
 		upper = Inf*ones(nl.model.nx)
 		lower[nl.model.idx[:lambda]] .= 0.0 # Impose nested parameter bounds ∈ [0,1]
