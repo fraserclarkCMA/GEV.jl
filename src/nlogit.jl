@@ -195,6 +195,8 @@ end
 grad_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = grad_nlogit_case(theta, nl.model, nl.data[id])
 
 function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data, flags::Dict, idx::Dict, RUM::Bool)  
+	
+	small = 1e-300
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -237,7 +239,7 @@ function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::n
 		∂V_∂λ = -V ./λ_k 	# Jl by 1 
 
 		IV = logsumexp(V)  	# Scalar
-		∂IV_∂V = multinomial(V)  # Jl by 1
+		∂IV_∂V = max.(small, multinomial(V))  # Jl by 1
 		∂IV_∂β = sum(repeat(∂IV_∂V, 1, K).*∂V_∂β,dims=1)[:]
 		∂IV_∂λ = sum(∂IV_∂V.*∂V_∂λ, dims=1)[1]
 
@@ -266,7 +268,7 @@ function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::n
 		push!(∂D_∂λ, IV + λ_k*∂IV_∂λ)
 
 	end 
-	∂lnG_∂D = multinomial(D)
+	∂lnG_∂D = max.(small, multinomial(D))
 	∂lnG_∂β = sum((∂lnG_∂D.*∂D_∂β)[l]  for l in 1:length(D))
 	∂lnG_∂λ = ∂lnG_∂D.*∂D_∂λ 
 	if flags[:alpha]
@@ -294,6 +296,7 @@ end
 
 function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data,
 										flags::Dict, idx::Dict, RUM::Bool)  
+	small = 1e-300
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -336,7 +339,7 @@ function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlo
 		∂V_∂λ = -V ./λ_k 	# Jl by 1 
 
 		IV = logsumexp(V)  	# Scalar
-		∂IV_∂V = multinomial(V)  # Jl by 1
+		∂IV_∂V = max.(small, multinomial(V) ) # Jl by 1
 		∂IV_∂β = sum(repeat(∂IV_∂V, 1, K).*∂V_∂β,dims=1)[:]
 		∂IV_∂λ = sum(∂IV_∂V.*∂V_∂λ, dims=1)[1]
 
@@ -368,7 +371,7 @@ function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlo
 		push!(∂D_∂λ, IV + λ_k*∂IV_∂λ)
 	end 
 	LL -= logsumexp(D)
-	∂lnG_∂D = multinomial(D)
+	∂lnG_∂D = max.(small, multinomial(D))
 	∂lnG_∂β = sum((∂lnG_∂D.*∂D_∂β)[l]  for l in 1:length(D))
 	∂lnG_∂λ = ∂lnG_∂D.*∂D_∂λ 
 	if flags[:alpha]
@@ -411,6 +414,7 @@ fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlo
 
 function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, 
 		RUM::Bool, outside_share::Float64, case_id::Symbol, nest_id::Symbol, choice_id::Symbol) where T<:Real
+	small = 1e-300
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -432,7 +436,7 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 			λ_k = lambda[1]
 		end
 		V = Xj*beta /λ_k
-		push!(s_jg , multinomial(V))
+		push!(s_jg , max.(small, multinomial(V)) )
 		if flags[:alpha]
 			W = Wk*alpha
 			push!(denom, W[1] + λ_k*logsumexp(V))	
@@ -440,7 +444,7 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 			push!(denom, λ_k*logsumexp(V))	
 		end		
 	end
-	s_g = multinomial(denom)
+	s_g = max.(small,multinomial(denom))
 	DF = DataFrame[]
 	for (g, nest_data) in enumerate(nlnd)
 		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data
