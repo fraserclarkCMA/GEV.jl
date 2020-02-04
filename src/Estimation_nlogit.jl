@@ -124,15 +124,6 @@ function estimate_nlogit_parallel(nl::nlogit, opt_method::Symbol, grad_type::Sym
 end
 
 function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbol, x_initial::Vector{Float64}, algorithm, optim_opts)
-	#=
-	ll_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = ll_nlogit_case(beta, nl.model, nl.data[id])
-	grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = grad_nlogit_case(beta,nl.model, nl.data[id]) 
-	analytic_grad_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_grad_nlogit_case(beta,nl.model, nl.data[id]) 
-	hessian_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = hessian_nlogit_case(beta, nl.model, nl.data[id]) 
-	fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fg_nlogit_case(beta, nl.model, nl.data[id]) 
-	analytic_fg_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = analytic_fg_nlogit_case(beta, nl.model, nl.data[id]) 
-	fgh_nlogit_case(beta::Vector{T}, id::Int64) where T<:Real = fgh_nlogit_case(beta, nl.model, nl.data[id]) 
-	=#
 
 	# Define vector 
 	NUMOBS = length(nl.data)
@@ -177,19 +168,6 @@ function estimate_nlogit_serial(nl::nlogit, opt_method::Symbol, grad_type::Symbo
 		if F != nothing
 			return sum([y.F for y in clc])
 		end
-	end
-
-	# Do optimisation 
-	if opt_method == :grad
-		if grad_type == :analytic
-			out = Optim.optimize(Optim.only_fg!(nlogit_analytic_fg!), x_initial, algorithm, optim_opts)
-		else 
-			out = Optim.optimize(Optim.only_fg!(nlogit_fg!), x_initial, algorithm, optim_opts)
-		end
-	elseif opt_method == :hess
-		out = Optim.optimize(Optim.only_fgh!(nlogit_fgh!), x_initial, algorithm, optim_opts)
-	else 
-		out = Optim.optimize(nlogit_ll, x_initial, NelderMead(), optim_opts)
 	end
 
 	# Step 3: Do optimisation 
