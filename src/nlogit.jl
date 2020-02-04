@@ -196,7 +196,7 @@ grad_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = grad_n
 
 function analytic_grad_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data, flags::Dict, idx::Dict, RUM::Bool)  
 	
-	small = 1e-300
+	small = eps()
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -296,7 +296,7 @@ end
 
 function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data,
 										flags::Dict, idx::Dict, RUM::Bool)  
-	small = 1e-300
+	small = eps()
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -414,7 +414,7 @@ fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlo
 
 function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, 
 		RUM::Bool, outside_share::Float64, case_id::Symbol, nest_id::Symbol, choice_id::Symbol) where T<:Real
-	small = 1e-300
+	small = eps()
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
