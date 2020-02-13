@@ -293,6 +293,8 @@ analytic_grad_nlogit_case(x::Vector{Float64}, nl::nlogit, id::Int64) = analytic_
 function fg_nlogit_case(theta::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real
 	nlogit_case(ll_nlogit_case(theta, model, data), grad_nlogit_case(theta, model, data), Matrix{T}(undef,0,0)) 
 end
+fg_nlogit_case(x::Vector{Float64}, nl::nlogit, id::Int64) = fg_nlogit_case(x, nl.model, nl.data[id])
+
 
 function analytic_fg_nlogit_case(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data,
 										flags::Dict, idx::Dict, RUM::Bool)  
@@ -480,4 +482,3 @@ function nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
 	end
 	return outdf
 end	
-
