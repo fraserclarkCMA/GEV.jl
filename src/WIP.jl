@@ -54,15 +54,15 @@ function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_cas
 		∂V_∂β = Xj ./λ_k 	# J x K of ∂Vj_∂βk = ∂V_∂β[j,k]
 
 		IV = logsumexp(V)  	# Scalar
-		s_jg = max.(small, multinomial(V))  # Jl by 1 -> within group prob s_i|g
+		push!(s_jg , max.(small, multinomial(V)))  # Jl by 1 -> within group prob s_i|g
 		if Nbeta >1
-			∂IV_∂β = sum(repeat(s_jg, 1, K).*∂V_∂β,dims=1)[:]
+			∂IV_∂β = sum(repeat(s_jg[nest_ctr], 1, K).*∂V_∂β,dims=1)[:]
 		else 
-			∂IV_∂β = sum(s_jg.*∂V_∂β,dims=1)[:]
+			∂IV_∂β = sum(s_jg[nest_ctr].*∂V_∂β,dims=1)[:]
 		end
 
 		∂V_∂λ = -V ./λ_k 	# Jl by 1
-		∂IV_∂λ = sum(s_jg.*∂V_∂λ, dims=1)[1]
+		∂IV_∂λ = sum(s_jg[nest_ctr].*∂V_∂λ, dims=1)[1]
 		push!(nest_idx, nest_num) # Order of nests in the data
 		
 		if flags[:alpha]
@@ -78,10 +78,10 @@ function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_cas
 		# Somewhere in here i need a gradient vector for each j in the nest
 		@inbounds for j in 1:J
 			# Gradient of within group prob wrt :beta
-			grad_sjg[nest_ctr][j][idx[:beta]] .+= s_jg[j].*(∂V_∂β[j,:] .- ∂IV_∂β)
+			grad_sjg[nest_ctr][j][idx[:beta]] .+= s_jg[nest_ctr][j].*(∂V_∂β[j,:] .- ∂IV_∂β)
 
 			# Gradient of within group prob wrt :lambda 
-			grad_sjg[nest_ctr][j][idx[:lambda][nest_num]] += s_jg[j].*(∂V_∂λ[j] .- ∂IV_∂λ)
+			grad_sjg[nest_ctr][j][idx[:lambda][nest_num]] += s_jg[nest_ctr][j].*(∂V_∂λ[j] .- ∂IV_∂λ)
 		end
 		
 	end 
@@ -90,15 +90,15 @@ function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_cas
 	sg = (1.0 .- outside_share).*max.(small, multinomial(D)) # G x 1 vector of nest probs
 	∂lnG_∂β = sum((sg.*∂D_∂β)[l]  for l in 1:NumberOfNests)
 	if flags[:alpha]
-		∂lnG_∂α = [sg[l].*∂D_∂α[l] for l in 1:NumberOfNests] 
+		∂lnG_∂α = sum([sg[l].*∂D_∂α[l] for l in 1:NumberOfNests])
 	end	
 	∂lnG_∂λ = sg.*∂D_∂λ 
 
 	# Gradients of sg
 	for (ctr, nest_num) in enumerate(nest_idx)
 		grad_sg[ctr] = zeros(Nx)
-		grad_sg[ctr][idx[:beta]] .+= sg[ctr].*(∂D_∂β[ctr] .- ∂lnG_∂β)
-		grad_sg[ctr][idx[:lambda][nest_num]] .+= sg[ctr]*∂lnG_∂β[nest_num]
+		grad_sg[ctr][idx[:beta]] .+= sg[ctr].*(∂D_∂β[ctr] .- ∂lnG_∂β)	
+		grad_sg[ctr][idx[:lambda][nest_num]] += sg[ctr]*∂lnG_∂β[nest_num]
 
 		if flags[:alpha]
 			grad_sg[ctr][idx[:alpha]] .+= sg[ctr].*(∂D_∂α[ctr] .- ∂lnG_∂α)
@@ -111,7 +111,7 @@ function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_cas
 		end
 
 		# Gradient of sj
-		grad_sj[ctr] = sg[ctr].*grad_sjg[ctr] .+ s_jg[ctr].*grad_sg[ctr]
+		grad_sj[ctr] = sg[ctr].*grad_sjg[ctr] .+ s_jg[ctr].*[grad_sg[ctr] for j in 1:length(s_jg[ctr])]
 	end 
 
 	# Need to add a method to output in a way linked to the input data 
