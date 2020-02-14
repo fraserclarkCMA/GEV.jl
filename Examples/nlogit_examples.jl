@@ -142,7 +142,7 @@ nlogit chosen cost distance rating || type: income , base(family) || restaurant:
 
 # Nested Logit - Model 2 - use Newton + Hessian for this and price optimisation trace
 f2 = @formula( chosen ~ income&nestid);
-nlm2 = nlogit_model(f1, f2, df; case=:family_id, nests = :nestnum, choice_id=:family_id, 
+nlm2 = nlogit_model(f1, f2, df; case=:family_id, nests = :nestnum, choice_id=:restaurant, 
 									RUM=false, num_lambda=number_of_nests, nest_labels=nest_labels); 
 
 # Nested Logit
@@ -183,7 +183,7 @@ Note: Optim.jl finds marginally lower log-likelihood hence small differences in 
 # Nested Logit - Model 3
 f1 = @formula( chosen ~ cost + distance + rating);
 f3 = @formula( chosen ~ income&nestid + kids&nestid);
-nlm3 = nlogit_model(f1, f3, df; case=:family_id, nests = :nestnum, choice_id=:family_id, 
+nlm3 = nlogit_model(f1, f3, df; case=:family_id, nests = :nestnum, choice_id=:restaurant, 
 					RUM=false, num_lambda=number_of_nests, nest_labels=nest_labels); 
 
 # Nested Logit - with data

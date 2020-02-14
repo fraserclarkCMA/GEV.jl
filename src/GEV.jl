@@ -14,6 +14,7 @@ include("Estimation_nlogit.jl")
 include("utils.jl")
 include("Elasticities_clogit.jl")
 include("Elasticities_nlogit.jl")
+include("WIP.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
 	   clogit_data, clogit_case_data, make_clogit_data, 
@@ -36,7 +37,7 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   clogit_prob, grad_clogit_prob,
 	   elas_own_clogit, grad_elas_own_clogit,
 	   elas_cross_clogit, grad_elas_cross_clogit,
-	   nlogit_prob,
+	   nlogit_prob, grad_nlogit_prob, fg_nlogit_prob,
 	   elas_own_nlogit, grad_elas_own_nlogit,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,

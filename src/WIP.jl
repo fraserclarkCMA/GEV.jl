@@ -1,5 +1,5 @@
 
-function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data, flags::Dict, idx::Dict, outside_share::Float64)  
+function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data, flags::Dict, idx::Dict, outside_share::Float64, case_id::Symbol, nest_id::Symbol, choice_id::Symbol)  
 	
 	small = eps()
 	vec_to_theta!(x, θ, flags, idx)	
@@ -115,6 +115,82 @@ function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_cas
 	end 
 
 	# Need to add a method to output in a way linked to the input data 
+	out_sj = VV{Float64}()
+	for (ctr, ∇sj_nest) in enumerate(grad_sj)
+		if ctr == 1
+			out_sj = ∇sj_nest
+		else 
+			append!(out_sj, ∇sj_nest)
+		end
+	end
+	out_sjg = VV{Float64}()
+	for (ctr, ∇sjg_nest) in enumerate(grad_sjg)
+		if ctr == 1
+			out_sjg = ∇sjg_nest
+		else 
+			append!(out_sjg, ∇sjg_nest)
+		end
+	end
+	out_sg = VV{Float64}()
+	for (ctr, ∇sg_nest) in enumerate(grad_sg)
+		if ctr == 1
+			out_sg = [∇sg_nest for j in 1:size(data[ctr].Xj, 1)]
+		else 
+			append!(out_sg, [∇sg_nest for j in 1:size(data[ctr].Xj, 1) ])
+		end
+	end
+	return out_sj, out_sjg, out_sg
 
-	return grad_sj, grad_sjg, grad_sg
 end
+
+grad_nlogit_prob(x::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real = 
+	grad_nlogit_prob(x, model.params, data, model.flags, model.idx, model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id)
+
+grad_nlogit_prob(x::Vector{T}, nl::nlogit, case_num::Int64) where T<:Real = grad_nlogit_prob(x, nl.model, nl.data[case_num])
+
+function grad_nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
+	∇sj = VV{Float64}()
+	∇sjg = VV{Float64}()
+	∇sg = VV{Float64}()
+	for (ctr, case_data) in enumerate(nl.data)
+       if ctr==1
+       	   (∇sj,∇sjg, ∇sg)= grad_nlogit_prob(x, nl.model, case_data)
+       else
+			res = grad_nlogit_prob(x, nl.model, case_data)
+			append!(∇sj , res[1])
+			append!(∇sjg , res[2])
+			append!(∇sg , res[3])
+       end
+    end
+	return ∇sj, ∇sjg, ∇sg
+end
+
+function fg_nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
+	∇sj = VV{Float64}()
+	∇sjg = VV{Float64}()
+	∇sg = VV{Float64}()
+	for (ctr, case_data) in enumerate(nl.data)
+       if ctr==1
+       	   (∇sj,∇sjg, ∇sg)= grad_nlogit_prob(x, nl.model, case_data)
+       else
+			res = grad_nlogit_prob(x, nl.model, case_data)
+			append!(∇sj , res[1])
+			append!(∇sjg , res[2])
+			append!(∇sg , res[3])
+       end
+    end
+    df = nlogit_prob(x, nl)
+    df.grad_sj=∇sj
+    df.grad_sjg=∇sjg
+    df.grad_sg=∇sg
+    return df
+end
+
+
+
+
+
+
+
+
+
