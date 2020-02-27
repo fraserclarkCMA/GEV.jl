@@ -14,7 +14,6 @@ include("Estimation_nlogit.jl")
 include("utils.jl")
 include("Elasticities_clogit.jl")
 include("Elasticities_nlogit.jl")
-include("WIP.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
 	   clogit_data, clogit_case_data, make_clogit_data, 
