@@ -1,5 +1,6 @@
+# Gradient of nested logit probability
 
-function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data, flags::Dict, idx::Dict, outside_share::Float64, case_id::Symbol, nest_id::Symbol, choice_id::Symbol)  
+function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_case_data, flags::Dict, idx::Dict, outside_share::Float64)  
 	
 	small = eps()
 	vec_to_theta!(x, θ, flags, idx)	
@@ -144,7 +145,7 @@ function grad_nlogit_prob(x::Vector{Float64}, θ::nlogit_param, data::nlogit_cas
 end
 
 grad_nlogit_prob(x::Vector{T}, model::nlogit_model, data::nlogit_case_data) where T<:Real = 
-	grad_nlogit_prob(x, model.params, data, model.flags, model.idx, model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id)
+	grad_nlogit_prob(x, model.params, data, model.flags, model.idx , model.opts[:outside_share])
 
 grad_nlogit_prob(x::Vector{T}, nl::nlogit, case_num::Int64) where T<:Real = grad_nlogit_prob(x, nl.model, nl.data[case_num])
 
@@ -185,8 +186,6 @@ function fg_nlogit_prob(x::Vector{T}, nl::nlogit) where T<:Real
     df.grad_sg=∇sg
     return df
 end
-
-
 
 
 
