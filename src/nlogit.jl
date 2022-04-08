@@ -42,20 +42,20 @@ function make_nlogit_data(model::nlogit_model, df::DataFrame)
 	dataset = Vector{nlogit_nest_data}[]
 	for casedf in groupby(df, case_id)
 		casedata = []
-		j_idx = findall(x->x==1, casedf[f_beta.lhs.sym])
-		dstar = casedf[j_idx, choice_id][1]
+		j_idx = findall(x->x==1, casedf[!, f_beta.lhs.sym])
+		dstar = convert(String, casedf[j_idx, choice_id][1])
 		nest_star = casedf[j_idx, nest_id][1]
 		for nestdf in groupby(casedf, nest_id)
 			nestnum = nestdf[1,nest_id]
 			if nestnum == nest_star
-				jstar = findall(x->x==1, nestdf[f_beta.lhs.sym])[1]
+				jstar = findall(x->x==1, nestdf[!, f_beta.lhs.sym])[1]
 			else
 				jstar = 0
 			end
 			Xj = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ?  Matrix{Float64}(undef, 0, 0) : modelcols(f_beta , nestdf)[2]
 			Wk = isa(f_alpha.rhs.terms[1], StatsModels.InterceptTerm{false}) ? Matrix{Float64}(undef, 0, 0) : modelcols(f_alpha , nestdf)[2] 
 			groupid = nestdf[1, case_id][1]
-			push!(casedata, nlogit_nest_data(groupid, nestdf[choice_id][:], jstar, dstar, nest_star, nestnum, Xj, Wk ))
+			push!(casedata, nlogit_nest_data(groupid, nestdf[!, choice_id], jstar, dstar, nest_star, nestnum, Xj, Wk ))
 		end
 		push!(dataset, casedata)
 	end

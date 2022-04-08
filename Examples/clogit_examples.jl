@@ -15,7 +15,7 @@ using GEV
 using CSV, DataFrames, Optim, StatsModels
 
 # cd into GEV.jl
-df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv");
+df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv", DataFrame);
 
 # ******************************************************** #
 
@@ -50,15 +50,15 @@ vcat(["Variable" "Coef." "std err"], [cl.model.coefnames xstar se])
 # Calculate predicted purchase probabilities
 cl.model.opts[:outside_good] = 0.9;
 prob_df = clogit_prob(xstar, cl);
-df = join(df, prob_df, on=[cl.model.case_id, cl.model.choice_id], kind=:left);
+df = leftjoin(df, prob_df, on=[cl.model.case_id, cl.model.choice_id]);
 
 # Calculate elasticities: own, cross
 price_vars = [1];
 ejj = elas_own_clogit(xstar, cl, price_vars);
 ekj = elas_cross_clogit(xstar, cl, price_vars);
 elasdf = ejj;
-elasdf = join(elasdf, ekj, on=[cl.model.case_id, cl.model.choice_id], kind=:left);
-df = join(df, elasdf, on=[cl.model.case_id, cl.model.choice_id], kind=:left);
+elasdf = leftjoin(elasdf, ekj, on=[cl.model.case_id, cl.model.choice_id]);
+df = leftjoin(df, elasdf, on=[cl.model.case_id, cl.model.choice_id]);
 
 #=
 ∇e_jj = grad_elas_own_clogit(xstar, cl, price_vars);

@@ -26,7 +26,7 @@ using CSV, DataFrames, StatsModels, Optim, LinearAlgebra
 cd(@__DIR__)
 df = CSV.read("./Data/restaurant.csv");
 =#
-df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv");
+df = CSV.read(joinpath(@__DIR__,"./Git/GEV/Examples/Data/restaurant.csv"), DataFrame);
 
 # clogit formula
 f1 = @formula( chosen ~ cost + distance + rating);

@@ -1,6 +1,6 @@
 module GEV
 
-using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim, TSVD, ParallelDataTransfer
+using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim, TSVD, ParallelDataTransfer, CategoricalArrays
 
 using Distributed
 

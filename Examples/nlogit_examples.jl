@@ -12,12 +12,11 @@ Pkg.instantiate()
 using GEV
 
 # Additional packages for examples 
-using CSV, DataFrames, Optim, StatsModels, Random, StatsBase
+using CSV, DataFrames, Optim, StatsModels, Random, StatsBase, CategoricalArrays
 
 # cd into GEV.jl
-; cd Git/GEV
 #= ; cd path to GEV.jl =#
-df = CSV.read("./Examples/Data/restaurant.csv");
+df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv", DataFrame);
 
 # ********************* ADD NESTS TO THE DATAFRAME ************************* #
 
@@ -25,13 +24,13 @@ nestlist = ["fast","fast","family","family","family","fancy","fancy"];
 nestframe = DataFrame(:nestid=>levels(nestlist), :nestnum=>collect(1:length(levels(nestlist));));
 jlist =  ["Freebirds","MamasPizza", "CafeEccell","LosNortenos","WingsNmore","Christophers","MadCows"];
 nests = DataFrame(:restaurant=>jlist,:nestid=>nestlist);
-nests = join(nests,nestframe, on=:nestid);
-categorical!(nests, :nestid);
-df = join(df,nests,on=:restaurant);
+nests = innerjoin(nests,nestframe, on=:nestid);
+nests.nestid = categorical(nests.nestid);
+df = innerjoin(df,nests,on=:restaurant);
 
 # Information needed in estimation
 number_of_nests = length(levels(nestlist));
-nest_labels = sort!(unique(df[:,[:nestnum, :nestid]]), :nestnum)[:nestid]
+nest_labels = sort!(unique(df[:,[:nestnum, :nestid]]), :nestnum).nestid
 
 # ********************** ESTIMATE: NL MODEL 1 ******************************* #
 
@@ -75,18 +74,16 @@ vcat(["Variable" "Coef." "std err"],[nl1.model.coefnames xstar1 se1])
 # Purchase Probabilities
 nl1.model.opts[:outside_share] = 0.5
 prob_df = nlogit_prob(xstar1, nl1);
-prob_df = join(prob_df, nestframe, on=nl1.model.nest_id )
-df = join(df, prob_df, on=[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id], kind=:left; makeunique=true);
+prob_df = innerjoin(prob_df, nestframe, on=nl1.model.nest_id )
+df = leftjoin(df, prob_df, on=[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id]; makeunique=true);
 
 # Check RUM 
-prob_df[:TS1] = TS1.(prob_df[:pr_g]);
-prob_df[:TS2] = TS2.(prob_df[:pr_g]);
-RUMtest = by(prob_df, 
-	[:nestid, nl1.model.nest_id], 
-	[:TS1, :TS2] =>
-		x->(TS1 = minimum(x.TS1), TS2 = minimum(x.TS2)));
-RUMtest[:lambda] = nl1.model.params.lambda[RUMtest[nl1.model.nest_id]];
-RUMtest[:isRUM] = RUMtest[:lambda] .< RUMtest[:TS2];
+prob_df[!, :TS1] = TS1.(prob_df[!, :pr_g]);
+prob_df[!, :TS2] = TS2.(prob_df[!, :pr_g]);
+RUMtest = combine(groupby(prob_df,[:nestid, nl1.model.nest_id]), 
+	:TS1 => minimum => :TS1, :TS2 => minimum => :TS2)
+RUMtest[!, :lambda] = nl1.model.params.lambda[RUMtest[!, nl1.model.nest_id]];
+RUMtest[!, :isRUM] = RUMtest.lambda .< RUMtest.TS2;
 RUMtest
 
 # Elasticities for cost (note RUM 0<λg<1 doesn't hold... but check formats)
@@ -96,11 +93,11 @@ ekjg = elas_within_nlogit(xstar1, nl1, price_indices);
 ekj = elas_across_nlogit(xstar1, nl1, price_indices);
 
 elasdf = ejj;
-elasdf = join(elasdf, 
-			ekjg[[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id, :ekjg ]], 
+elasdf = innerjoin(elasdf, 
+			ekjg[!, [nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id, :ekjg ]], 
 				on=[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id]);
-elasdf = join(elasdf, 
-			ekj[[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id, :ekj ]], 
+elasdf = innerjoin(elasdf, 
+			ekj[!, [nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id, :ekj ]], 
 			on=[nl1.model.case_id, nl1.model.nest_id, nl1.model.choice_id]);
 elasdf
 
@@ -112,21 +109,20 @@ elasdf
 # Note: (note RUM 0<λg<1 doesn't hold... but check formats)
 
 # Suppose I have some weights 
-elasdf[:sample_wgts] = 100*rand(nrow(df));
+elasdf[!, :sample_wgts] = 100*rand(nrow(df));
 
 # Calculate elasticities: unweighted and weighted by choice option
-by(elasdf, 
-	:restaurant,
-	 [:ejj, :ekjg, :ekj, :sample_wgts] =>
-	  x->(
-	  		ejj=mean(x.ejj), 
-	  		wgt_ejj=mean(x.ejj, weights(x.sample_wgts)),
-	  		ekjg=mean(x.ekjg), 
-	  		wgt_ekjg=mean(x.ekjg, weights(x.sample_wgts)),
-	  		ekj=mean(x.ekj), 
-	  		wgt_ekj=mean(x.ekj, weights(x.sample_wgts))
-	 	)
-)
+combine(groupby(elasdf,:restaurant)) do x
+	DataFrame(
+		:ejj => mean(x.ejj), 
+		:wgt_ejj => mean(x.ejj, weights(x.sample_wgts)),
+  		:ekjg=>mean(x.ekjg), 
+  		:wgt_ekjg=>mean(x.ekjg, weights(x.sample_wgts)),
+  		:ekj=>mean(x.ekj), 
+  		:wgt_ekj=>mean(x.ekj, weights(x.sample_wgts)) 
+	)
+end
+
 
 # *************************  ESTIMATE: NL MODEL 2 **************************** #
 
@@ -225,16 +221,3 @@ LL3 = -Optim.minimum(opt3);
 
 println("Log-likelihood = $(round(LL3,digits=4))")
 vcat(["Variable" "Coef." "std err"],[nl3.model.coefnames xstar3 se3])
-
-
-# Pick one model to do post-estimation
-
-
-# Calculate predicted purchase probabilities
-share_inside_goods = 0.1;
-df[:s_j_cond] = clogit_prob(xstar, cl.data);
-df[:s_j_unc] = share_inside_goods.*df[:s_j_cond];
-
-# Calculate elasticities: own, cross
-df[:e_jj] = elas_own_clogit(xstar, cl.data, 1);
-df[:e_kj] = elas_cross_clogit(xstar, cl.data, 1);

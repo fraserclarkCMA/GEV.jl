@@ -1,4 +1,9 @@
 
+function categorical!(df::DataFrame, x::Symbol)
+	df[!, x] = categorical(df.x)
+	return nothing
+end 
+
 function logsumexp(V::Vector{T}) where T<:Real
 	maxV = maximum(V)
 	return maxV + log(sum(exp.(V .- maxV)))
