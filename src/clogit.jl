@@ -3,12 +3,12 @@
 function make_clogit_data(model::clogit_model, df::DataFrame)
 	@unpack f_beta, params, case_id, choice_id, opts = model 
 	f_beta = StatsModels.apply_schema(f_beta, StatsModels.schema(f_beta, df))
-	dataset = Vector{clogit_case_data}()
+	dataset = Vector{clogit_case_data}()	
 	for casedf in groupby(df, case_id)
 		case_num = casedf[!, case_id][1]
 		jid = casedf[!, choice_id]
 		jstar = findall(x->x==1, casedf[!, f_beta.lhs.sym])[1]
-		dstar = convert(String,casedf[jstar, choice_id])
+		dstar = casedf[jstar, choice_id]
 		Xj = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ?  Matrix{Float64}(undef, 0, 0) : modelcols(f_beta , casedf)[2]
 		push!(dataset, clogit_case_data(case_num , jid, jstar, dstar, Xj))
 	end

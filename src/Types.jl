@@ -39,7 +39,7 @@ struct clogit_case_data
 	case_num 	:: Int64 				# Choice Group id
 	jid 		:: Vector 				# Choice identifier
 	jstar 		:: Int64 				# Position of chosen option in chosen nest in the data
-	dstar 		:: Union{Int64,String}	# Identifier of chosen option 
+	dstar 		:: Any					# Identifier of chosen option 
 	Xj			:: Matrix{Float64}		# Matrix of regressors for within-nest
 end
 clogit_case_data() = new()
@@ -81,7 +81,7 @@ nlogit_param(NX::Int64,NW::Int64,NN::Int64) where T<:Real = nlogit_param(zeros(F
 	choice_id :: Symbol 		# Choice identifier variable
 	idx 	:: Dict 			# Index for parameters
 	nx 		:: Int64 			# Number of parameters 
-	coefnames :: Any 		# Coef names
+	coefnames :: Any 			# Coef names
 	opts 	:: Dict 			# Group id var, number of different nesting parameters, nest id
 	flags	:: Dict 			# Flags indicating which of beta, alpha and tau are estimated	
 end
@@ -90,7 +90,7 @@ struct nlogit_nest_data
 	case_num 	:: Int64 				# Choice Group id
 	jid 		:: Vector 				# Choice identifier
 	jstar 		:: Int64 				# Position of chosen option in chosen nest in the data
-	dstar 		:: Union{Int64,String}	# Identifier of chosen option 
+	dstar 		:: Any					# Identifier of chosen option 
 	nest_star	:: Int64 				# Chosen nest 
 	nest_num 	:: Int64
 	Xj			:: Matrix{Float64}		# Matrix of regressors for within-nest
