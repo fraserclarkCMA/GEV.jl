@@ -43,7 +43,7 @@ function make_nlogit_data(model::nlogit_model, df::DataFrame)
 	for casedf in groupby(df, case_id)
 		casedata = []
 		j_idx = findall(x->x==1, casedf[!, f_beta.lhs.sym])
-		dstar = convert(String, casedf[j_idx, choice_id][1])
+		dstar = casedf[j_idx, choice_id][1]
 		nest_star = casedf[j_idx, nest_id][1]
 		for nestdf in groupby(casedf, nest_id)
 			nestnum = nestdf[1,nest_id]
