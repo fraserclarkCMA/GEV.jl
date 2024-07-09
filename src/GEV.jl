@@ -16,7 +16,6 @@ include("utils.jl")
 include("Elasticities_clogit.jl")
 include("Elasticities_nlogit.jl")
 include("AggregateDemand_clogit.jl")
-include("AggDRandElas_clogit.jl")
 include("SupplySide_BertrandNash_clogit.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
