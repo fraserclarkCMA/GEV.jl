@@ -7,18 +7,14 @@
 using Distributed
 
 #* This activates the project environment on startup (i.e. ] -> (GEV) pkg)  prompt)
-addprocs(6; exeflags="--project=./Git/GEV" )    
-@everywhere push!(LOAD_PATH, "./Git")
-@everywhere using Pkg
 
-if Sys.islinux()
-	# Avoid Git locking by doing in sequence when calling from same local drive
-	for w in workers()
-		remotecall_fetch(()->Pkg.instantiate(), w)
-	end
-else 
-	@everywhere Pkg.instantiate()
-end 
+addprocs(6; exeflags="--project=~/Git/GEV.jl" )    
+
+@everywhere begin
+	using Pkg
+	Pkg.activate("./Git/GEV.jl")
+	Pkg.instantiate()
+end
 
 @everywhere using GEV
 using CSV, DataFrames, StatsModels, Optim, LinearAlgebra
@@ -26,7 +22,7 @@ using CSV, DataFrames, StatsModels, Optim, LinearAlgebra
 cd(@__DIR__)
 df = CSV.read("./Data/restaurant.csv");
 =#
-df = CSV.read(joinpath(@__DIR__,"./Git/GEV/Examples/Data/restaurant.csv"), DataFrame);
+df = CSV.read(joinpath(@__DIR__,"./Git/GEV.jl/Examples/Data/restaurant.csv"), DataFrame);
 
 # clogit formula
 f1 = @formula( chosen ~ cost + distance + rating);
@@ -48,8 +44,13 @@ result = estimate_clogit(cl; opt_mode = :parallel, 	# <- Need to call :parallel 
 # Optimal parameter value
 LLstar = -Optim.minimum(result);
 xstar = Optim.minimizer(result);
-se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
+se = std_err(xstar, cl)
+#se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
 coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
+
+# Print out results - this is working and checks out versus stata!
+println("Log-likelihood = $(round(LLstar,digits=4))")
+vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
 
 
 # Option 2. Estimate clogit model with LBFGS() or other algorithm only requiring gradients
@@ -63,10 +64,15 @@ result = estimate_clogit(cl; opt_mode = :parallel, 	# <- Need to call :parallel 
 # Optimal parameter value
 LLstar = -Optim.minimum(result);
 xstar = Optim.minimizer(result);
-se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
+se = std_err(xstar, cl)
+#se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
 coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 
-# Option 2. Estimate clogit model with Newton() or other method requiring Hessian
+# Print out results - this is working and checks out versus stata!
+println("Log-likelihood = $(round(LLstar,digits=4))")
+vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
+
+# Option 3. Estimate clogit model with Newton() or other method requiring Hessian
 result = estimate_clogit(cl; opt_mode = :parallel,
 							 opt_method = :hess,  
 							x_initial = randn(cl.model.nx),
@@ -76,13 +82,15 @@ result = estimate_clogit(cl; opt_mode = :parallel,
 
 LLstar = -Optim.minimum(result);
 xstar = Optim.minimizer(result);
-se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
+se = std_err(xstar, cl)
+#se = sqrt.(diag(inv(pmap_hessian_clogit(xstar, cl.data))));
 coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 
 
 # Print out results - this is working and checks out versus stata!
 println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
+
 
 #=
 

@@ -5,7 +5,6 @@ function elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share:
 							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
 	@unpack case_num, jid, jstar, dstar, Xj = clcd
 	
-	small = eps()
 	# Step 1: get price terms
 	J = size(Xj,1)
 	alpha_x_price = zeros(eltype(beta), J)
@@ -15,7 +14,8 @@ function elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share:
 
 	# Step 2: Get prob purchase
 	V = Xj*beta
-	pr_j = (1.0 .- outside_share).*max.(small, multinomial(V))
+	#pr_j = (1.0 .- outside_share).*multinomial(V)
+	pr_j = multinomial(V)
 
 	return DataFrame(case_id=>case_num.*ones(J), choice_id=>jid, :ejj=>alpha_x_price.*(1.0 .- pr_j)) 
 end
@@ -36,6 +36,7 @@ end
 
 elas_own_clogit(beta::Vector{T}, cl::clogit, price_indices::Vector{Int64}) where T<:Real = 
 	elas_own_clogit(beta, cl.data, cl.model.opts[:outside_share], cl.model.case_id, cl.model.choice_id, price_indices)
+
 #=
 function grad_elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, 
 							case_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
@@ -55,8 +56,9 @@ end
 
 grad_elas_own_clogit(beta::Vector{T}, cl::clogit, price_indices::Vector{Int64}) where T<:Real = 
 	grad_elas_own_clogit(beta, cl.data, cl.model.opts[:outside_share], cl.model.case_id, cl.model.choice_id, price_indices)
-=#
 
+=#
+	
 #= Cross price Elasticities =#
 
 function elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64,

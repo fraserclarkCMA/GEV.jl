@@ -1,6 +1,7 @@
 module GEV
 
 using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim, TSVD, ParallelDataTransfer, CategoricalArrays
+using StatsBase, Statistics
 
 using Distributed
 
@@ -14,6 +15,9 @@ include("Estimation_nlogit.jl")
 include("utils.jl")
 include("Elasticities_clogit.jl")
 include("Elasticities_nlogit.jl")
+include("AggregateDemand_clogit.jl")
+include("AggDRandElas_clogit.jl")
+include("SupplySide_BertrandNash_clogit.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
 	   clogit_data, clogit_case_data, make_clogit_data, 
@@ -40,7 +44,10 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_own_nlogit, grad_elas_own_nlogit,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,
-	   TS1, TS2
+	   TS1, TS2, DemandOutputs_clogit_case, AggregateDemand,
+	   AggregateDiversionRatioMatrix, 
+	   AggregateElasticityMatrix, make_ownership_matrix, 
+	   FOC, getMC, getMARGIN
 	  
 
 end 

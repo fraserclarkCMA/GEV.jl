@@ -6,7 +6,7 @@
 # ******************************************************** #
 
 using Pkg
-Pkg.activate("./Git/GEV")
+Pkg.activate("./Git/GEV.jl")
 Pkg.instantiate()
 
 using GEV
@@ -15,7 +15,7 @@ using GEV
 using CSV, DataFrames, Optim, StatsModels
 
 # cd into GEV.jl
-df = CSV.read("./Git/GEV/Examples/Data/restaurant.csv", DataFrame);
+df = CSV.read("./Git/GEV.jl/Examples/Data/restaurant.csv", DataFrame);
 
 # ******************************************************** #
 
