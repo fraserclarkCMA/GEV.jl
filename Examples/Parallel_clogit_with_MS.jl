@@ -98,7 +98,6 @@ POST_OWN= make_ownership_matrix(firm_df, :post_owner)
 
 # FOC under new merger under static Bertrand-nash competition
 df1 = deepcopy(df0)
-
 foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :cost, pos_cost, pos_cost_div_Y)
 
 # Solve for post-merger prices (start from pre-merger)
