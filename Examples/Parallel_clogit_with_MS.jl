@@ -53,21 +53,24 @@ vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
 # ----------- POST-ESTIMATION DEMAND SIDE OUTPUTS ------------- #
 
 # AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
+
+df0 = deepcopy(df);
 pos_cost = 1
 pos_cost_div_Y = 4
-AD = AggregateDemand(xstar, df, cl, pos_cost, pos_cost_div_Y )
+AD = AggregateDemand(xstar, df0, cl, pos_cost, pos_cost_div_Y )
 AD.PROB
 AD.DQ
 
 # AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
 # Evaluate at New Point
 PRICE = combine(groupby(df, :restaurant), :cost => mean => :price).price
-AD = AggregateDemand(xstar, df, cl.model, PRICE, :cost, pos_cost, pos_cost_div_Y )
+AD = AggregateDemand(xstar, df0, cl.model, PRICE, :cost, pos_cost, pos_cost_div_Y )
 AD.PROB
 AD.DQ
+CW0 = AD.CW
 
 # FIRM LEVEL DIVERSION RATIO
-firm_df = combine(groupby(df, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost => mean => :price)
+firm_df = combine(groupby(df0, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost => mean => :price)
 OWN = make_ownership_matrix(firm_df, :owner)
 DR = AggregateDiversionRatioMatrix( AD.DQ , OWN.IND)
 
@@ -94,7 +97,9 @@ firm_df.post_owner[firm_df.owner.==3] .= 4
 POST_OWN= make_ownership_matrix(firm_df, :post_owner)
 
 # FOC under new merger under static Bertrand-nash competition
-foc(x) = FOC(zeros(J), xstar, df, cl.model, MC, POST_OWN.MAT, x, :cost, pos_cost, pos_cost_div_Y)
+df1 = deepcopy(df0)
+
+foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :cost, pos_cost, pos_cost_div_Y)
 
 # Solve for post-merger prices (start from pre-merger)
 post_res = nlsolve(foc, PRICE)
@@ -103,4 +108,8 @@ post_res = nlsolve(foc, PRICE)
 PRICE1 = post_res.zero
 PriceIncrease = (PRICE1 .- PRICE ) ./ PRICE
 
+# Consumer Welfare Change
+CW0 = AggregateDemand(xstar, df0, cl.model, PRICE, :cost, pos_cost, pos_cost_div_Y ).CW
+CW1 = AggregateDemand(xstar, df1, cl.model, PRICE1, :cost, pos_cost, pos_cost_div_Y ).CW
+CW_CHANGE = CW1/CW0 - 1
 

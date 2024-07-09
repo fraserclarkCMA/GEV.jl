@@ -40,7 +40,7 @@ function DemandOutputs_clogit_case(beta::AbstractVector, clcd::clogit_case_data,
 	PRODSi = zeros(Int64,J)
 	PRODSi[jid] .= 1
 
-	return (PRODS = PRODSi, CTR = PRODSi*PRODSi', PROB=PROBi, DQ = DQi)
+	return (PRODS = PRODSi, CTR = PRODSi*PRODSi', PROB=PROBi, DQ = DQi , CW = logsumexp(V))
 
 end
 
@@ -51,6 +51,7 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
 	@assert eltype(df[!, cl.model.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
 
 	J = maximum(df[!, cl.model.choice_id])
+	CW = 0.
 	PRODS = zeros(Int64, J)
 	CTR = zeros(Int64, J, J)
 	PROB = zeros(Float64,J)
@@ -61,9 +62,10 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
 		CTR += Di.CTR
 		PROB += Di.PROB
 		DQ += Di.DQ
+		CW += Di.CW
 	end
 
-	return (PROB = PROB ./ PRODS, DQ = DQ ./ CTR) 
+	return (PROB = PROB ./ PRODS, DQ = DQ ./ CTR, CW = CW) 
 
 end 
 
