@@ -2,6 +2,8 @@
 
 using Distributed
 
+addprocs(3)
+
 @everywhere begin
 	using Pkg
 	Pkg.activate("./Git/GEV.jl")
@@ -17,13 +19,11 @@ prods = unique(df.restaurant);
 J = length(prods);
 prod_df = DataFrame(:restaurant => prods, :pid => Int.(collect(1:length(prods))), :owner=>[1,1,2,2,3,3,4]);
 df = leftjoin(df, prod_df, on=:restaurant);
-df.cost0 = deepcopy(df.cost);
-df.invY = 1 ./ df.income;
 
 # Setup
 
 # clogit formula
-f1 = @formula( chosen ~ cost + cost&invY + distance + rating);
+f1 = @formula( chosen ~ cost + distance + rating);
 
 # clogit - Model
 clm = clogit_model(f1, df ; case=:family_id, choice_id=:pid)
@@ -55,26 +55,35 @@ vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
 # AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
 
 df0 = deepcopy(df);
-pos_cost = 1
-pos_cost_div_Y = 4
-AD = AggregateDemand(xstar, df0, cl, pos_cost, pos_cost_div_Y )
+
+# No interactions
+pos_price = findall(cl.model.coefnames .== "cost")[1] # Must be an Int()
+pos_price_interactions = Int64[]
+AD = AggregateDemand(xstar, df0, cl, pos_price, pos_price_interactions )
 AD.PROB
 AD.DQ
 
+# ----- NEW PRICE POINT ---- #
+
 # AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
+
 # Evaluate at New Point
-PRICE = combine(groupby(df, :restaurant), :cost => mean => :price).price
-AD = AggregateDemand(xstar, df0, cl.model, PRICE, :cost, pos_cost, pos_cost_div_Y )
+df_NEW = combine(groupby(df0, :restaurant), :cost => mean => :cost )
+
+#PRICE = combine(groupby(df, :restaurant), :cost => mean => :cost ).cost
+AD = AggregateDemand(xstar, df0, cl.model, PRICE, df_NEW.cost,  pos_price, pos_price_interactions )
 AD.PROB
 AD.DQ
 CW0 = AD.CW
 
 # FIRM LEVEL DIVERSION RATIO
-firm_df = combine(groupby(df0, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost => mean => :price)
+firm_df = combine(groupby(df0, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost=> mean => :price)
 OWN = make_ownership_matrix(firm_df, :owner)
+
 DR = AggregateDiversionRatioMatrix( AD.DQ , OWN.IND)
 
 # FIRM LEVEL PRICE ELASTICITY MATRIX 
+PRICE = df_NEW.cost;
 E = AggregateElasticityMatrix(AD.DQ, AD.PROB, PRICE, OWN.IND)
 
 # ----------- SUPPLY SIDE ----------- #
@@ -98,7 +107,7 @@ POST_OWN= make_ownership_matrix(firm_df, :post_owner)
 
 # FOC under new merger under static Bertrand-nash competition
 df1 = deepcopy(df0)
-foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :cost, pos_cost, pos_cost_div_Y)
+foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :cost, pos_price, pos_price_interactions)
 
 # Solve for post-merger prices (start from pre-merger)
 post_res = nlsolve(foc, PRICE)
@@ -108,7 +117,7 @@ PRICE1 = post_res.zero
 PriceIncrease = (PRICE1 .- PRICE ) ./ PRICE
 
 # Consumer Welfare Change
-CW0 = AggregateDemand(xstar, df0, cl.model, PRICE, :cost, pos_cost, pos_cost_div_Y ).CW
-CW1 = AggregateDemand(xstar, df1, cl.model, PRICE1, :cost, pos_cost, pos_cost_div_Y ).CW
+CW0 = AggregateDemand(xstar, df0, cl.model, PRICE, :cost, pos_price, pos_price_interactions ).CW
+CW1 = AggregateDemand(xstar, df1, cl.model, PRICE1, :cost, pos_price, pos_price_interactions ).CW
 CW_CHANGE = CW1/CW0 - 1
 

@@ -6,6 +6,7 @@ using StatsBase, Statistics
 using Distributed
 
 VV{T} = Vector{Vector{T}}
+ScalarOrVector{T} = Union{T,Vector{T}}
 
 include("Types.jl")
 include("clogit.jl")
@@ -44,7 +45,7 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,
 	   TS1, TS2, DemandOutputs_clogit_case, AggregateDemand,
-	   AggregateDiversionRatioMatrix, 
+	   AggregateDemandNew, AggregateDiversionRatioMatrix, 
 	   AggregateElasticityMatrix, make_ownership_matrix, 
 	   FOC, getMC, getMARGIN
 	  

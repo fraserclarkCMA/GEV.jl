@@ -16,7 +16,7 @@ clogit_param(NX::Int64) where T<:Real = clogit_param(zeros(Float64,NX))
 	choice_id :: Symbol 		# Choice identifier variable
 	idx 	:: Dict 			# Index for parameters
 	nx 		:: Int64 			# Number of parameters 
-	coefnames :: Any 		# Coefficient names
+	coefnames :: Any 			# Coefficient names
 	opts 	:: Dict 			# Group id var, number of different nesting parameters, nest id
 end
 
@@ -41,6 +41,8 @@ struct clogit_case_data
 	jstar 		:: Int64 				# Position of chosen option in chosen nest in the data
 	dstar 		:: Any					# Identifier of chosen option 
 	Xj			:: Matrix{Float64}		# Matrix of regressors for within-nest
+	xlevel_id 	:: Symbol 				# ID of levels of x variable
+	xlevel_var 	:: Vector 				# Levels of x variable (pass separately in case only do interaction)
 end
 clogit_case_data() = new()
 

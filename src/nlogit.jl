@@ -416,7 +416,7 @@ fgh_nlogit_case(theta::Vector{T}, nl::nlogit, id::Int64) where T<:Real = fgh_nlo
 
 function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, flags::Dict, idx::Dict, 
 		RUM::Bool, outside_share::Float64, case_id::Symbol, nest_id::Symbol, choice_id::Symbol) where T<:Real
-	small = eps()
+	
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -438,7 +438,7 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 			λ_k = lambda[1]
 		end
 		V = Xj*beta /λ_k
-		push!(s_jg , max.(small, multinomial(V)) )
+		push!(s_jg , multinomial(V)) 
 		if flags[:alpha]
 			W = Wk*alpha
 			push!(denom, W[1] + λ_k*logsumexp(V))	
@@ -446,7 +446,7 @@ function nlogit_prob(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, fla
 			push!(denom, λ_k*logsumexp(V))	
 		end		
 	end
-	s_g = max.(small,multinomial(denom))
+	s_g = multinomial(denom)
 	DF = DataFrame[]
 	for (g, nest_data) in enumerate(nlnd)
 		@unpack case_num, jid, jstar, dstar, nest_star, nest_num, Xj, Wk = nest_data

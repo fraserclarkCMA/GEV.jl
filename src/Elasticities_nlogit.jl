@@ -1,7 +1,7 @@
 
 function elas_own_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, 
 							flags::Dict, idx::Dict, RUM::Bool, outside_share::Float64, 
-								case_id::Symbol, nest_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+								case_id::Symbol, nest_id::Symbol, choice_id::Symbol, xvar_indices::Vector{Int64}) where T<:Real
 	
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
@@ -20,16 +20,16 @@ function elas_own_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data,
 		elasdf = leftjoin(elasdf, df, on=[case_id, nest_id, choice_id])
 
 		# Step 1: Price Terms
-		alpha_x_price = zeros(eltype(x),J)
-		for inds in price_indices
-			alpha_x_price .+= Xj[:,inds].*beta[inds]
+		alpha_x_xvar = zeros(eltype(x),J)
+		for inds in xvar_indices
+			alpha_x_xvar .+= Xj[:,inds].*beta[inds]
 		end			
 			
 		# Step 2: Get nest parameter
 		λg = Numλ > 1 ? lambda[nest_num] : lambda[1]
 
 		# Step 3: Calculate elasticity
-		elasdf[!, :ejj] = alpha_x_price.*( 1.0 .- λg.*elasdf.pr_j .- (1.0 .- λg).*elasdf.pr_jg) ./λg
+		elasdf[!, :ejj] = alpha_x_xvar.*( 1.0 .- λg.*elasdf.pr_j .- (1.0 .- λg).*elasdf.pr_jg) ./λg
 
 		# Step 4: Move Dataframe to storage vector 
 		push!(EDF, elasdf)
@@ -46,13 +46,13 @@ function elas_own_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data,
 
 end
 
-elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, price_indices::Vector{Int64}) where T<:Real =
-	elas_own_nlogit(x, model.params, nlnd, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id, price_indices) 
+elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, xvar_indices::Vector{Int64}) where T<:Real =
+	elas_own_nlogit(x, model.params, nlnd, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id, xvar_indices) 
 
-function elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
+function elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, xvar_indices::Vector{Int64}) where T<:Real
 	EDF = DataFrame[]
 	for case_data in nld
-		push!(EDF, elas_own_nlogit(x, model, case_data, price_indices))
+		push!(EDF, elas_own_nlogit(x, model, case_data, xvar_indices))
 	end
 	outdf = deepcopy(EDF[1])
 	@inbounds for n in 2:length(EDF)
@@ -61,11 +61,11 @@ function elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, pr
 	return outdf
 end	
 
-elas_own_nlogit(x::Vector{T}, nl::nlogit, price_indices::Vector{Int64}) where T<:Real = elas_own_nlogit(x, nl.model, nl.data, price_indices)
+elas_own_nlogit(x::Vector{T}, nl::nlogit, xvar_indices::Vector{Int64}) where T<:Real = elas_own_nlogit(x, nl.model, nl.data, xvar_indices)
 
 # ------------- Gradient of elasticities --------------- #
 
-function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, xvar_indices::Vector{Int64}) where T<:Real
 	
 	# Ease of reference
 	idx = deepcopy(model.idx)
@@ -97,9 +97,9 @@ function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_ca
 	K = size(nlnd[1].Xj, 2);
 	X = reshape(X, J, K)
 
-	alpha_x_price = X[:,price_indices]*x[price_indices]
+	alpha_x_xvar = X[:,xvar_indices]*x[xvar_indices]
 
-	LT = X[:,price_indices]*x[price_indices]./λg
+	LT = X[:,xvar_indices]*x[xvar_indices]./λg
 	∂LT_∂β = [zeros(Nbeta) for j in 1:J]
 	∂LT_∂α = Nalpha>0 ? [zeros(Nalpha) for j in 1:J] : []
 	∂LT_∂λ = [zeros(Numλ) for j in 1:J]
@@ -113,7 +113,7 @@ function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_ca
 		for j in 1:J
 			# λg[j] = lambda[g]
 			g =  df_probs[j,nest_id]			
-			∂LT_∂β[j] .+= vec(X[idx[:beta],price_indices]./λg[j])
+			∂LT_∂β[j] .+= vec(X[idx[:beta],xvar_indices]./λg[j])
 			∂RT_∂β[j] .+= -λg[j].*∇s_j[j][idx[:beta]] .- (1.0 .- λg[j]).*∇s_jg[j][idx[:beta]]
 			for l in 1:Numλ
 				if l==g
@@ -130,7 +130,7 @@ function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_ca
 	else
 		for j in 1:J
 			g =  df_probs[j,nest_id]			
-			∂LT_∂β[j] .+= vec(X[idx[:beta],price_indices]./λg[j])
+			∂LT_∂β[j] .+= vec(X[idx[:beta],xvar_indices]./λg[j])
 			∂RT_∂β[j] .+= -λg[j].*∇s_j[j][idx[:beta]] .- (1.0 .- λg[j]).*∇s_jg[j][idx[:beta]]
 			∂RT_∂α[j] .+= -λg[j].*∇s_j[j][idx[:alpha]] .- (1.0 .- λg[j]).*∇s_jg[j][idx[:alpha]]
 			for l in 1:Numλ
@@ -150,10 +150,10 @@ function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_ca
 
 end
 
-function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_own_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, xvar_indices::Vector{Int64}) where T<:Real
 	EJJ = Float64[]
 	for case_data in nld
-		append!(EJJ, grad_elas_own_nlogit(x, model, case_data, price_indices))
+		append!(EJJ, grad_elas_own_nlogit(x, model, case_data, xvar_indices))
 	end
 	return EJJ
 end
@@ -164,7 +164,7 @@ end
 
 function elas_within_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, 
 							flags::Dict, idx::Dict, RUM::Bool, outside_share::Float64, 
-								case_id::Symbol, nest_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+								case_id::Symbol, nest_id::Symbol, choice_id::Symbol, xvar_indices::Vector{Int64}) where T<:Real
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
 
@@ -182,16 +182,16 @@ function elas_within_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_da
 		elasdf = leftjoin(elasdf, df, on=[case_id, nest_id, choice_id])
 
 		# Step 1: Price Terms
-		alpha_x_price = zeros(eltype(x),J)
-		for inds in price_indices
-			alpha_x_price .+= Xj[:,inds].*beta[inds]
+		alpha_x_xvar = zeros(eltype(x),J)
+		for inds in xvar_indices
+			alpha_x_xvar .+= Xj[:,inds].*beta[inds]
 		end			
 			
 		# Step 2: Get nest parameter
 		λg = Numλ > 1 ? lambda[nest_num] : lambda[1]
 
 		# Step 3: Calculate elasticity
-		elasdf[!, :ekjg] = -alpha_x_price.*( λg.*elasdf.pr_j .+ (1.0 .- λg).*elasdf.pr_jg ) ./λg
+		elasdf[!, :ekjg] = -alpha_x_xvar.*( λg.*elasdf.pr_j .+ (1.0 .- λg).*elasdf.pr_jg ) ./λg
 
 		# Step 4: Move Dataframe to storage vector 
 		push!(EDF, elasdf)
@@ -208,13 +208,13 @@ function elas_within_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_da
 
 end
 
-elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, price_indices::Vector{Int64}) where T<:Real =
-	elas_within_nlogit(x, model.params, nlnd, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id, price_indices) 
+elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, xvar_indices::Vector{Int64}) where T<:Real =
+	elas_within_nlogit(x, model.params, nlnd, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id, xvar_indices) 
 
-function elas_within_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
+function elas_within_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, xvar_indices::Vector{Int64}) where T<:Real
 	EDF = DataFrame[]
 	for case_data in nld
-		push!(EDF, elas_within_nlogit(x, model, case_data, price_indices))
+		push!(EDF, elas_within_nlogit(x, model, case_data, xvar_indices))
 	end
 	outdf = deepcopy(EDF[1])
 	@inbounds for n in 2:length(EDF)
@@ -223,12 +223,12 @@ function elas_within_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data,
 	return outdf
 end	
 
-elas_within_nlogit(x::Vector{T}, nl::nlogit, price_indices::Vector{Int64}) where T<:Real = elas_within_nlogit(x, nl.model, nl.data, price_indices)
+elas_within_nlogit(x::Vector{T}, nl::nlogit, xvar_indices::Vector{Int64}) where T<:Real = elas_within_nlogit(x, nl.model, nl.data, xvar_indices)
 
 
 # ------------- Gradient of elasticities --------------- #
 
-function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, xvar_indices::Vector{Int64}) where T<:Real
 	
 	# Ease of reference
 	idx = deepcopy(model.idx)
@@ -260,9 +260,9 @@ function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 	K = size(nlnd[1].Xj, 2);
 	X = reshape(X, J, K)
 
-	alpha_x_price = X[:,price_indices]*x[price_indices]
+	alpha_x_xvar = X[:,xvar_indices]*x[xvar_indices]
 
-	LT = -alpha_x_price./λg
+	LT = -alpha_x_xvar./λg
 	∂LT_∂β = [zeros(Nbeta) for j in 1:J]
 	∂LT_∂α = Nalpha>0 ? [zeros(Nalpha) for j in 1:J] : []
 	∂LT_∂λ = [zeros(Numλ) for j in 1:J]
@@ -276,7 +276,7 @@ function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 		for j in 1:J
 			# λg[j] = lambda[g]
 			g =  df_probs[j,nest_id]			
-			∂LT_∂β[j] .+= vec(-X[idx[:beta],price_indices]./λg[j])
+			∂LT_∂β[j] .+= vec(-X[idx[:beta],xvar_indices]./λg[j])
 			∂RT_∂β[j] .+= λg[j].*∇s_j[j][idx[:beta]] .+ (1.0 .- λg[j]).*∇s_jg[j][idx[:beta]]
 			for l in 1:Numλ
 				if l==g
@@ -293,7 +293,7 @@ function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 	else
 		for j in 1:J
 			g =  df_probs[j,nest_id]			
-			∂LT_∂β[j] .+= vec(-X[idx[:beta],price_indices]./λg[j])
+			∂LT_∂β[j] .+= vec(-X[idx[:beta],xvar_indices]./λg[j])
 			∂RT_∂β[j] .+= λg[j].*∇s_j[j][idx[:beta]] .+ (1.0 .- λg[j]).*∇s_jg[j][idx[:beta]]
 			∂RT_∂α[j] .+= λg[j].*∇s_j[j][idx[:alpha]] .+ (1.0 .- λg[j]).*∇s_jg[j][idx[:alpha]]
 			for l in 1:Numλ
@@ -313,10 +313,10 @@ function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 
 end
 
-function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_within_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, xvar_indices::Vector{Int64}) where T<:Real
 	EKJG = Float64[]
 	for case_data in nld
-		append!(EKJG, grad_elas_within_nlogit(x, model, case_data, price_indices))
+		append!(EKJG, grad_elas_within_nlogit(x, model, case_data, xvar_indices))
 	end
 	return EKJG
 end
@@ -325,7 +325,7 @@ end
 
 function elas_across_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_data, 
 							flags::Dict, idx::Dict, RUM::Bool, outside_share::Float64, 
-								case_id::Symbol, nest_id::Symbol, choice_id::Symbol, price_indices::Vector{Int64}) where T<:Real
+								case_id::Symbol, nest_id::Symbol, choice_id::Symbol, xvar_indices::Vector{Int64}) where T<:Real
 	
 	vec_to_theta!(x, θ, flags, idx)	
 	@unpack beta, alpha, lambda = θ
@@ -344,16 +344,16 @@ function elas_across_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_da
 		elasdf = leftjoin(elasdf, df, on=[case_id, nest_id, choice_id])
 
 		# Step 1: Price Terms
-		alpha_x_price = zeros(eltype(x),J)
-		for inds in price_indices
-			alpha_x_price .+= Xj[:,inds].*beta[inds]
+		alpha_x_xvar = zeros(eltype(x),J)
+		for inds in xvar_indices
+			alpha_x_xvar .+= Xj[:,inds].*beta[inds]
 		end			
 			
 		# Step 2: Get nest parameter
 		λg = Numλ > 1 ? lambda[nest_num] : lambda[1]
 
 		# Step 3: Calculate elasticity
-		elasdf[!, :ekj] = -alpha_x_price.*elasdf.pr_j
+		elasdf[!, :ekj] = -alpha_x_xvar.*elasdf.pr_j
 
 		# Step 4: Move Dataframe to storage vector 
 		push!(EDF, elasdf)
@@ -371,13 +371,13 @@ function elas_across_nlogit(x::Vector{T}, θ::nlogit_param, nlnd::nlogit_case_da
 end
 
 
-elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, price_indices::Vector{Int64}) where T<:Real =
-	elas_across_nlogit(x, model.params, nlnd, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id, price_indices) 
+elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, xvar_indices::Vector{Int64}) where T<:Real =
+	elas_across_nlogit(x, model.params, nlnd, model.flags, model.idx, model.opts[:RUM], model.opts[:outside_share], model.case_id, model.nest_id, model.choice_id, xvar_indices) 
 
-function elas_across_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
+function elas_across_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, xvar_indices::Vector{Int64}) where T<:Real
 	EDF = DataFrame[]
 	for case_data in nld
-		push!(EDF, elas_across_nlogit(x, model, case_data, price_indices))
+		push!(EDF, elas_across_nlogit(x, model, case_data, xvar_indices))
 	end
 	outdf = deepcopy(EDF[1])
 	@inbounds for n in 2:length(EDF)
@@ -386,13 +386,13 @@ function elas_across_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data,
 	return outdf
 end	
 
-elas_across_nlogit(x::Vector{T}, nl::nlogit, price_indices::Vector{Int64}) where T<:Real = elas_across_nlogit(x, nl.model, nl.data, price_indices)
+elas_across_nlogit(x::Vector{T}, nl::nlogit, xvar_indices::Vector{Int64}) where T<:Real = elas_across_nlogit(x, nl.model, nl.data, xvar_indices)
 
 
 
 # ------------- Gradient of elasticities --------------- #
 
-function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit_case_data, xvar_indices::Vector{Int64}) where T<:Real
 	
 	# Ease of reference
 	idx = deepcopy(model.idx)
@@ -422,9 +422,9 @@ function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 	K = size(nlnd[1].Xj, 2);
 	X = reshape(X, J, K)
 
-	alpha_x_price = X[:,price_indices]*x[price_indices]
+	alpha_x_xvar = X[:,xvar_indices]*x[xvar_indices]
 
-	LT = -alpha_x_price
+	LT = -alpha_x_xvar
 	∂LT_∂β = [zeros(Nbeta) for j in 1:J]
 	∂LT_∂α = Nalpha>0 ? [zeros(Nalpha) for j in 1:J] : []
 	∂LT_∂λ = [zeros(Numλ) for j in 1:J]
@@ -435,7 +435,7 @@ function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 	∂RT_∂λ = [zeros(Numλ) for j in 1:J]
 
 	for j in 1:J
-		∂LT_∂β[j] .+= vec(-X[idx[:beta],price_indices])
+		∂LT_∂β[j] .+= vec(-X[idx[:beta],xvar_indices])
 		∂RT_∂β[j] .+= ∇s_j[j][idx[:beta]] 
 	end 
 	if Nalpha==0
@@ -449,10 +449,10 @@ function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nlnd::nlogit
 	end
 end
 
-function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, price_indices::Vector{Int64}) where T<:Real
+function grad_elas_across_nlogit(x::Vector{T}, model::nlogit_model, nld::nlogit_data, xvar_indices::Vector{Int64}) where T<:Real
 	EKJ = Float64[]
 	for case_data in nld
-		append!(EKJ, grad_elas_across_nlogit(x, model, case_data, price_indices))
+		append!(EKJ, grad_elas_across_nlogit(x, model, case_data, xvar_indices))
 	end
 	return EKJ
 end
