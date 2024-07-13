@@ -45,7 +45,7 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,
 	   TS1, TS2, DemandOutputs_clogit_case, AggregateDemand,
-	   AggregateDemandNew, AggregateDiversionRatioMatrix, 
+	   AggregateDiversionRatioMatrix, 
 	   AggregateElasticityMatrix, make_ownership_matrix, 
 	   FOC, getMC, getMARGIN
 	  
