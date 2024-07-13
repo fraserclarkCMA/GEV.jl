@@ -83,7 +83,8 @@ AD.DQ
 
 # Evaluate at New Point
 df_NEW = combine(groupby(df0, :restaurant), :cost => mean => :cost )
-AD = AggregateDemand(xstar, df0, cl.model, df_NEW.cost, :invY, :cost_div_Y, pos_price, pos_price_interactions )
+PRICE0 = df_NEW.cost # Take an average price for simplicity and testing
+AD = AggregateDemand(xstar, df0, cl.model, PRICE0, :invY, :cost_div_Y, pos_price, pos_price_interactions )
 AD.PROB
 AD.DQ
 CW0 = AD.CW
@@ -94,15 +95,15 @@ OWN = make_ownership_matrix(firm_df, :owner)
 DR = AggregateDiversionRatioMatrix( AD.DQ , OWN.IND)
 
 # FIRM LEVEL PRICE ELASTICITY MATRIX 
-E = AggregateElasticityMatrix(AD.DQ, AD.PROB, df_NEW.cost, OWN.IND)
+E = AggregateElasticityMatrix(AD.DQ, AD.PROB, PRICE0 , OWN.IND)
 
 # ----------- SUPPLY SIDE ----------- #
 
 # BACK OUT MARGINAL COSTS
-MC = getMC(AD.PROB,  df_NEW.cost, OWN.MAT, AD.DQ)
+MC = getMC(AD.PROB, PRICE0, OWN.MAT, AD.DQ)
 
 # AGGREGATE MULTI-PRODUCT MARGINS (%)
-MARGIN = getMARGIN(AD.PROB,  df_NEW.cost, OWN.IND, OWN.MAT, AD.DQ)
+MARGIN = getMARGIN(AD.PROB, PRICE0, OWN.IND, OWN.MAT, AD.DQ)
 
 # ------------------ #
 # MERGER SIMULATION
@@ -120,10 +121,9 @@ df1 = deepcopy(df0)
 foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :invY, :cost_div_Y, pos_price, pos_price_interactions)
 
 # Solve for post-merger prices (start from pre-merger)
-post_res = nlsolve(foc, df_NEW.cost)
+post_res = nlsolve(foc, PRICE0)
 
 # Price Rise 
-PRICE0 = df_NEW.cost
 PRICE1 = post_res.zero
 PriceIncrease = (PRICE1 .- PRICE0 ) ./ PRICE0
 

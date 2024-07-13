@@ -69,9 +69,9 @@ AD.DQ
 
 # Evaluate at New Point
 df_NEW = combine(groupby(df0, :restaurant), :cost => mean => :cost )
+PRICE0 = df_NEW.cost # Take an average price for simplicity and testing
 
-#PRICE = combine(groupby(df, :restaurant), :cost => mean => :cost ).cost
-AD = AggregateDemand(xstar, df0, cl.model, PRICE, df_NEW.cost,  pos_price, pos_price_interactions )
+AD = AggregateDemand(xstar, df0, cl.model, PRICE0,  :cost, pos_price, pos_price_interactions )
 AD.PROB
 AD.DQ
 CW0 = AD.CW
@@ -79,20 +79,18 @@ CW0 = AD.CW
 # FIRM LEVEL DIVERSION RATIO
 firm_df = combine(groupby(df0, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost=> mean => :price)
 OWN = make_ownership_matrix(firm_df, :owner)
-
 DR = AggregateDiversionRatioMatrix( AD.DQ , OWN.IND)
 
 # FIRM LEVEL PRICE ELASTICITY MATRIX 
-PRICE = df_NEW.cost;
-E = AggregateElasticityMatrix(AD.DQ, AD.PROB, PRICE, OWN.IND)
+E = AggregateElasticityMatrix(AD.DQ, AD.PROB, PRICE0, OWN.IND)
 
 # ----------- SUPPLY SIDE ----------- #
 
 # BACK OUT MARGINAL COSTS
-MC = getMC(AD.PROB, PRICE, OWN.MAT, AD.DQ)
+MC = getMC(AD.PROB, PRICE0, OWN.MAT, AD.DQ)
 
 # AGGREGATE MULTI-PRODUCT MARGINS (%)
-MARGIN = getMARGIN(AD.PROB, PRICE, OWN.IND, OWN.MAT, AD.DQ)
+MARGIN = getMARGIN(AD.PROB, PRICE0, OWN.IND, OWN.MAT, AD.DQ)
 
 # ------------------ #
 # MERGER SIMULATION
@@ -110,14 +108,14 @@ df1 = deepcopy(df0)
 foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :cost, pos_price, pos_price_interactions)
 
 # Solve for post-merger prices (start from pre-merger)
-post_res = nlsolve(foc, PRICE)
+post_res = nlsolve(foc, PRICE0)
 
 # Price Rise 
 PRICE1 = post_res.zero
-PriceIncrease = (PRICE1 .- PRICE ) ./ PRICE
+PriceIncrease = (PRICE1 .- PRICE0 ) ./ PRICE0
 
 # Consumer Welfare Change
-CW0 = AggregateDemand(xstar, df0, cl.model, PRICE, :cost, pos_price, pos_price_interactions ).CW
+CW0 = AggregateDemand(xstar, df0, cl.model, PRICE0, :cost, pos_price, pos_price_interactions ).CW
 CW1 = AggregateDemand(xstar, df1, cl.model, PRICE1, :cost, pos_price, pos_price_interactions ).CW
 CW_CHANGE = CW1/CW0 - 1
 
