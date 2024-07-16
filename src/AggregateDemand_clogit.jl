@@ -5,8 +5,8 @@
 =#
 
 # New cl.data from previous commands
-function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, 
-						xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
+function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int64,
+						xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[],)
 	
 	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
 	
@@ -15,8 +15,8 @@ function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data,
 	end
 
 	# Step 1: get price terms
-	J = size(Xj,1)
-	alpha_x_xvar = zeros(J)
+	J_CSi = size(Xj,1)
+	alpha_x_xvar = zeros(J_CSi)
 	all_xvars = vcat(xvarpos, interacted_xvarpos)
 	for inds in all_xvars
 		alpha_x_xvar .+= Xj[:,inds]*beta[inds]
@@ -59,7 +59,7 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
 	PROB = zeros(Float64,J)
 	DQ = zeros(Float64, J, J)
 	for clcd in cl.data
-		Di = DemandOutputs_clogit_case(beta, clcd, xvarpos, interacted_xvarpos)
+		Di = DemandOutputs_clogit_case(beta, clcd, J, xvarpos, interacted_xvarpos)
 		PRODS += Di.PRODS
 		CTR += Di.CTR
 		PROB += Di.PROB
@@ -86,7 +86,9 @@ function AggregateDemand(	beta::Vector, df::DataFrame, clm::clogit_model,
 	# New clogit data (but same model)
 	cl_new = clogit( clm, make_clogit_data(clm, df))
 
-	return AggregateDemand(beta, df, cl_new, xvarpos, interacted_xvarpos)
+	J = maximum(df[!, cl.model.choice_id])
+
+	return AggregateDemand(beta, df, cl_new, J, xvarpos, interacted_xvarpos)
 
 end 
 
@@ -113,7 +115,9 @@ function AggregateDemand(beta::Vector, df::DataFrame, clm::clogit_model,
 	# New clogit data (but same model)
 	cl_new = clogit( clm, make_clogit_data(clm, df))
 
-	return AggregateDemand(beta, df, cl_new, xvarpos, interacted_xvarpos)
+	J = maximum(df[!, cl.model.choice_id])
+
+	return AggregateDemand(beta, df, cl_new, J, xvarpos, interacted_xvarpos)
 
 end 
 
