@@ -70,10 +70,12 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
 	end
 
 	# In case product does not show up in choice set
+	PROB = PROB ./ PRODS
+	DQ = DQ ./ CTR
 	DQ[isnan.(DQ)] .= 0.
 	PROB[isnan.(PROB)] .= 0.
 
-	return (PROB = PROB ./ PRODS, DQ = DQ ./ CTR, CW = CW) 
+	return (PROB = PROB ./ PRODS, DQ = DQ , CW = CW) 
 
 end 
 
