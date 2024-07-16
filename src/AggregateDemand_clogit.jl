@@ -26,18 +26,36 @@ function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int6
 	V = Xj*beta
 	PROBi = multinomial(V)
 
+
+	temp_own = alpha_x_xvar .* (1 .- PROBi) .* PROBi ./ xlevel_var
+	temp_cross = -alpha_x_xvar .* PROBi ./ xlevel_var
+	temp_own[isnan.(temp_own)] .= 0
+	temp_cross[isnan.(temp_cross)] .= 0
+
+	# Step 3: Get individual outputs
+	DQi = zeros(J,J)
+	@inbounds for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
+		if j==k
+			DQi[j,k] = temp_own[nj]
+		else 
+			DQi[j,k] = temp_cross[nj] * PROBi[nk]
+		end
+	end 
+
+
+#=
 	# Step 3: Get individual outputs
 	DQi = zeros(J,J)
 	@inbounds for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
 		if xlevel_var[nj]==0 #= In case price is 0 =#
 			nothing
 		elseif j==k
-			DQi[j,k] = alpha_x_xvar[nj]*(1 - PROBi[nj]) * PROBi[nj] / xlevel_var[nj]
+			DQi[j,k] = alpha_x_xvar[nj] .* (1 .- PROBi[nj]) .* PROBi[nj] ./ xlevel_var[nj]
 		else 
-			DQi[j,k] = -alpha_x_xvar[nj] * PROBi[nj] * PROBi[nk] / xlevel_var[nj]
+			DQi[j,k] = -alpha_x_xvar[nj] .* PROBi[nj] .* PROBi[nk] / xlevel_var[nj]
 		end
 	end 
-
+=#
 	# Allow for choice set hetergeneity so add indicator functions
 	PRODSi = zeros(Int64,J)
 	PRODSi[jid] .= 1
