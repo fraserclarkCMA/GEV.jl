@@ -29,7 +29,7 @@ function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int6
 	# Step 3: Get individual outputs
 	DQi = zeros(J,J)
 	for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
-		if xlevel_var[j]==0 #= In case price is 0 =#
+		if xlevel_var[nj]==0 #= In case price is 0 =#
 			nothing
 		elseif j==k
 			DQi[j,k] = alpha_x_xvar[nj]*(1 - PROBi[nj]) * PROBi[nj] / xlevel_var[nj]
@@ -41,8 +41,10 @@ function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int6
 	# Allow for choice set hetergeneity so add indicator functions
 	PRODSi = zeros(Int64,J)
 	PRODSi[jid] .= 1
+	PROB = zeros(Float64,J)
+	PROB[jid] .= PROBi
 
-	return (PRODS = PRODSi, CTR = PRODSi*PRODSi', PROB=PROBi, DQ = DQi , CW = logsumexp(V))
+	return (PRODS = PRODSi, CTR = PRODSi*PRODSi', PROB=PROB, DQ = DQi , CW = logsumexp(V))
 
 end
 
