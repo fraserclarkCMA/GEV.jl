@@ -86,9 +86,7 @@ function AggregateDemand(	beta::Vector, df::DataFrame, clm::clogit_model,
 	# New clogit data (but same model)
 	cl_new = clogit( clm, make_clogit_data(clm, df))
 
-	J = maximum(df[!, cl.model.choice_id])
-
-	return AggregateDemand(beta, df, cl_new, J, xvarpos, interacted_xvarpos)
+	return AggregateDemand(beta, df, cl_new, xvarpos, interacted_xvarpos)
 
 end 
 
@@ -115,9 +113,7 @@ function AggregateDemand(beta::Vector, df::DataFrame, clm::clogit_model,
 	# New clogit data (but same model)
 	cl_new = clogit( clm, make_clogit_data(clm, df))
 
-	J = maximum(df[!, cl.model.choice_id])
-
-	return AggregateDemand(beta, df, cl_new, J, xvarpos, interacted_xvarpos)
+	return AggregateDemand(beta, df, cl_new, xvarpos, interacted_xvarpos)
 
 end 
 
