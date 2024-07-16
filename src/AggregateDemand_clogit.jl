@@ -75,7 +75,7 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
 	DQ[isnan.(DQ)] .= 0.
 	PROB[isnan.(PROB)] .= 0.
 
-	return (PROB = PROB ./ PRODS, DQ = DQ , CW = CW) 
+	return (PROB = PROB, DQ = DQ , CW = CW) 
 
 end 
 
