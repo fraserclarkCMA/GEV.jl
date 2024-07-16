@@ -28,7 +28,7 @@ function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int6
 
 	# Step 3: Get individual outputs
 	DQi = zeros(J,J)
-	for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
+	@inbounds for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
 		if xlevel_var[nj]==0 #= In case price is 0 =#
 			nothing
 		elseif j==k
@@ -60,7 +60,7 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
 	CTR = zeros(Int64, J, J)
 	PROB = zeros(Float64,J)
 	DQ = zeros(Float64, J, J)
-	for clcd in cl.data
+	@inbounds for clcd in cl.data
 		Di = DemandOutputs_clogit_case(beta, clcd, J, xvarpos, interacted_xvarpos)
 		PRODS += Di.PRODS
 		CTR += Di.CTR
