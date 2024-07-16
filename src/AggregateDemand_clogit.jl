@@ -47,7 +47,7 @@ function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int6
 	# Step 3: Get individual outputs
 	DQi = zeros(J,J)
 	@inbounds for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
-		if xlevel_var[nj]==0 #= In case price is 0 =#
+		if xlevel_var[nj]==0 
 			nothing
 		elseif j==k
 			DQi[j,k] = alpha_x_xvar[nj] .* (1 .- PROBi[nj]) .* PROBi[nj] ./ xlevel_var[nj]
