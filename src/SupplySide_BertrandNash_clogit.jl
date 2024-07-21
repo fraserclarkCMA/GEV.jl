@@ -1,36 +1,86 @@
-function make_ownership_matrix(df::DataFrame, groupvar::Symbol)
 
+
+function make_ownership_matrix(df::DataFrame, groupvar::Symbol)
 	indmat = StatsBase.indicatormat(df[!, groupvar])
 	return ( IND = indmat, MAT = indmat'*indmat)
-
 end
 
-function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64},
-				P, xvarname::Symbol, xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
+getMC(P::Vector, Q::Vector, dQdP::Matrix, OWN::Matrix) = P + (OWN .* dQdP)\Q
 
-	AD = AggregateDemand(beta, df, clm, P, xvarname, xvarpos, interacted_xvarpos)
-
-	F = AD.PROB .+ (OMEGA.*AD.DQ)*(P - MC)
-
-end
-
-# New function call to allow for interacted price and individual characteristic in merger sim
-function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64},
-				P, individual_varname::Symbol, xvarname::Symbol, 
-				xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
-
-	AD = AggregateDemand(beta, df, clm, P, individual_varname, xvarname, xvarpos, interacted_xvarpos)
-
-	F = AD.PROB .+ (OMEGA.*AD.DQ)*(P - MC)
-
-end
-
-getMC(prob::Vector, price::Vector, OWN::Matrix, DQ::Matrix) = price + (OWN .* DQ)\prob
-
-function getMARGIN(prob::Vector, price::Vector, IND::Matrix, OWN::Matrix, DQ::Matrix)
-	FIRM_SHARES = IND .* prob'
-	PROFIT = -FIRM_SHARES*((OWN.*DQ)\prob) 
-	REVENUE =  FIRM_SHARES*price
+function getMARGIN(Q::Vector, P::Vector, IND::Matrix, OWN::Matrix, dQdP::Matrix)
+	FIRM_QTY = IND .* Q'
+	PROFIT = -FIRM_QTY*((OWN.*dQdP)\Q) 
+	REVENUE =  FIRM_QTY*P
 	return PROFIT ./ REVENUE;
 end 
+
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+				 Pvarname::Symbol, Pvarpos::Int64, parallel::Bool=false)
+
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, P, Pvarname)
+
+	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, Pvarpos, parallel)
+
+	Q = getQty(AD)
+	dQdP = getdQdP(AD)
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::Int64, parallel::Bool=false)
+
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, P, Pvarname)
+
+	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
+
+	Q = getQty(AD)
+	dQdP = getdQdP(AD)
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::Vector{Int64}, parallel::Bool=false)
+
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, P, Pvarname)
+
+	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
+
+	Q = getQty(AD)
+	dQdP = getdQdP(AD)
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
+# Masks to allow for P/Y FOC 
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+				  xvar::Symbol, pvar::Symbol, zvar::Symbol, xvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
+
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, P, xvar, pvar, zvar)
+
+	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, xvarpos, parallel)
+
+	Q = getQty(AD)
+	dQdP = getdQdP(AD, true)
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
 

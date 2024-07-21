@@ -1,10 +1,5 @@
 # EXAMPLE -- clogit demand estimation with merger simulation
 
-#=
-  The difference with this simulation is to only include a price 
-  interaction: p/Y. Needed to make some additional functions.
-=#
-
 using Distributed
 
 addprocs(3)
@@ -22,13 +17,11 @@ df = CSV.read(joinpath(@__DIR__,"./Git/GEV.jl/Examples/Data/restaurant.csv"), Da
 
 prods = unique(df.restaurant);
 J = length(prods);
-prod_df = DataFrame(:restaurant => prods, 
-					:pid => Int.(collect(1:length(prods))), 
-					:owner=>[1,1,2,2,3,3,4]);
+prod_df = DataFrame(:restaurant => prods, :pid => Int.(collect(1:length(prods))), :owner=>[1,1,2,2,3,3,4]);
 df = leftjoin(df, prod_df, on=:restaurant);
 
 # This gives interaction, which then enters as an interaction 
-df.cost0 = deepcopy(df.cost);
+#df.cost0 = deepcopy(df.cost);
 df.invY = 1 ./ df.income;
 df.cost_div_Y = df.cost .* df.invY;
 
@@ -41,7 +34,9 @@ f1 = @formula( chosen ~ cost_div_Y + distance + rating);
 
 # clogit - Model
 clm = clogit_model(f1, df ; case=:family_id, choice_id=:pid)
-clm.opts[:xlevel_id] = :cost
+clm.opts[:PdivY] = true
+clm.opts[:pvar] = :cost
+clm.opts[:zvar] = :invY
 
 # Conditional Logit
 cl = clogit( clm, make_clogit_data(clm, df));
@@ -65,49 +60,87 @@ coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
 
-# ----------- POST-ESTIMATION DEMAND SIDE OUTPUTS ------------- #
+# ----------- POST-ESTIMATION DEMAND SIDE OUTPUTS AT A NEW PRICE POINT ------------- #
 
-# AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
-df0 = deepcopy(df);
+# Impose common price to check code for clogit
+df0 = deepcopy(df); # Data to add a new common price to
 
-# No interactions
-pos_price = findall(cl.model.coefnames .== "cost_div_Y")[1] # Must be an Int()
-pos_price_interactions = Int64[]
-AD = AggregateDemand(xstar, df0, cl, pos_price, pos_price_interactions )
-AD.PROB
-AD.DQ
+# No interactions with individual characteristics
+pos_PdivY = findall(cl.model.coefnames .== "cost_div_Y")[1] # Must be an Int()
 
-# ----- NEW PRICE POINT ---- #
+# New common price to test the code
+P0 =  combine(groupby(df0, :pid), :cost => mean => :cost).cost;
 
-# AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES
+# New clogit data with new price level and updated interaction used in the regression
+cl0 = new_clogit_data(df0, clm, P0, :cost_div_Y, :cost, :invY);
 
-# Evaluate at New Point
-df_NEW = combine(groupby(df0, :restaurant), :cost => mean => :cost )
-PRICE0 = df_NEW.cost # Take an average price for simplicity and testing
-AD = AggregateDemand(xstar, df0, cl.model, PRICE0, :invY, :cost_div_Y, pos_price, pos_price_interactions )
-AD.PROB
-AD.DQ
-CW0 = AD.CW
+# Product level output
+AD = AggregateDemand(xstar, df0, cl0, pos_PdivY);
+Q = getQty(AD)
+s = getShares(AD)
+PdivY = getX(AD)
+P = getP(AD)
+dQdP = getdQdP(AD, clm.opts[:PdivY])
+dsdP = dQdP ./ length(AD)
+DR = getDiversionRatioMatrix(AD, clm.opts[:PdivY])
+E = getElasticityMatrix(AD, clm.opts[:PdivY])
 
-# FIRM LEVEL DIVERSION RATIO
-firm_df = combine(groupby(df0, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost_div_Y => mean => :cost_div_Y )
+# ----------- POST-ESTIMATION GROUPED DEMAND SIDE OUTPUTS ------------- #
+
+# Get group product selector matrix
+firm_df = combine(groupby(df0, :pid), 
+					:restaurant => unique => :brand, 
+							:owner => unique => :owner)
 OWN = make_ownership_matrix(firm_df, :owner)
-DR = AggregateDiversionRatioMatrix( AD.DQ , OWN.IND)
 
-# FIRM LEVEL PRICE ELASTICITY MATRIX 
-E = AggregateElasticityMatrix(AD.DQ, AD.PROB, PRICE0 , OWN.IND)
+# FIRM LEVEL
+X_g = getGroupX(AD, OWN.IND)
+P_g = getGroupP(AD, OWN.IND)
+Q_g = getGroupQty(AD, OWN.IND)
+s_g = getGroupShares(AD, OWN.IND)
+dQdP_g = getGroupdQdP(AD, OWN.IND, clm.opts[:PdivY])
+dsdP_g = dQdP ./ length(AD)
+DR_g = getGroupDiversionRatioMatrix( AD , OWN.IND, clm.opts[:PdivY])
+E_g = getGroupElasticityMatrix(AD , OWN.IND, clm.opts[:PdivY])
 
-# ----------- SUPPLY SIDE ----------- #
+# ----------- POST-ESTIMATION SUPPLY-SIDE OUTPUTS ------------- #
 
-# BACK OUT MARGINAL COSTS
-MC = getMC(AD.PROB, PRICE0, OWN.MAT, AD.DQ)
+# Get Marginal Costs
+MC = getMC(P0,Q,dQdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dQdP) \ Q
 
-# AGGREGATE MULTI-PRODUCT MARGINS (%)
-MARGIN = getMARGIN(AD.PROB, PRICE0, OWN.IND, OWN.MAT, AD.DQ)
+#= OR can use shares
+	MC = getMC(P,s,dsdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dsdP) \ s
+=#
+
+# Margins under different market structure
+MARGIN_SPN = getMARGIN(Q, P, Matrix(I(J)), Matrix(I(J)), dQdP)
+[MARGIN_SPN -1 ./ diag(E) isapprox.(MARGIN_SPN .- -1 ./ diag(E), 0; atol=1e-6)] # Check
+
+# Product margin under multiproduct industry structure
+MARGIN_MPN = getMARGIN(Q, P, Matrix(I(J)), OWN.MAT, dQdP)
+[MARGIN_MPN  (P .-MC)./P isapprox.(MARGIN_MPN .- (P .-MC)./P , 0.; atol=1e-6)] # Check
+
+# Check aggregate elasticity vs lerner at the age
+FIRM_MARGIN = getMARGIN(Q, P, OWN.IND, OWN.MAT, dQdP)
+FIRM_AS_SPN_LERNER = - 1 ./ FIRM_MARGIN # Note lerner won't match diag(E_g), aggregation across products in elasticities removes within product cross partials (they are not held fixed)
+[FIRM_AS_SPN_LERNER diag(E_g)] # LERNER >= Egg because of multiproduct effect 
+[FIRM_MARGIN -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg
 
 # ------------------ #
 # MERGER SIMULATION
 # ------------------ #
+
+
+# Check FOC first at pre-merger values
+df1 = deepcopy(df0);
+
+PARALLEL_FLAG = false; # Faciltates distribution of demand output calculations
+FOC0(x) = FOC(zeros(J), xstar, df1, clm, MC, OWN.MAT, x, 
+									:cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
+
+# Check
+@time FOC0(P0)
+isapprox.(FOC0(P0) , 0; atol=1e-6) 
 
 using NLsolve
 
@@ -117,18 +150,18 @@ firm_df.post_owner[firm_df.owner.==3] .= 4
 POST_OWN= make_ownership_matrix(firm_df, :post_owner)
 
 # FOC under new merger under static Bertrand-nash competition
-df1 = deepcopy(df0)
-foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :invY, :cost_div_Y, pos_price, pos_price_interactions)
+PARALLEL_FLAG = false
+FOC1(x) = FOC(zeros(J), xstar, df1, clm, MC, POST_OWN.MAT, x,
+									 :cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
 
 # Solve for post-merger prices (start from pre-merger)
-post_res = nlsolve(foc, PRICE0)
+post_res = nlsolve(FOC1, P0)
 
 # Price Rise 
-PRICE1 = post_res.zero
-PriceIncrease = (PRICE1 .- PRICE0 ) ./ PRICE0
+P1 = post_res.zero
+PriceIncrease = (P1 .- P0 ) ./ P0
 
 # Consumer Welfare Change
-CW0 = AggregateDemand(xstar, df0, cl.model, PRICE0, :invY, :cost_div_Y, pos_price, pos_price_interactions).CW
-CW1 = AggregateDemand(xstar, df1, cl.model, PRICE1, :invY, :cost_div_Y, pos_price, pos_price_interactions ).CW
+CW0 = getCW(AggregateDemand(xstar, df0, cl0, pos_PdivY))
+CW1 = getCW(AggregateDemand(xstar, df1, new_clogit_data(df1, clm, P1, :cost_div_Y, :cost, :invY), pos_PdivY))
 CW_CHANGE = CW1/CW0 - 1
-

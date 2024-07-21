@@ -1,4 +1,5 @@
 
+
 # Construct the model data set 
 function make_clogit_data(model::clogit_model, df::DataFrame)
 	@unpack f_beta, params, case_id, choice_id, opts = model 
@@ -10,10 +11,12 @@ function make_clogit_data(model::clogit_model, df::DataFrame)
 		jstar = findall(x->x==1, casedf[!, f_beta.lhs.sym])[1]
 		dstar = casedf[jstar, choice_id]
 		Xj = isa(f_beta.rhs.terms[1], StatsModels.InterceptTerm{false}) ?  Matrix{Float64}(undef, 0, 0) : modelcols(f_beta , casedf)[2]
-		if !haskey(opts, :xlevel_id)
-			push!(dataset, clogit_case_data(case_num , jid, jstar, dstar, Xj, Symbol(), Float64[]))
-		else 
-			push!(dataset, clogit_case_data(case_num , jid, jstar, dstar, Xj, opts[:xlevel_id], casedf[!, opts[:xlevel_id]]))
+		if !haskey(opts, :zvar) || !haskey(opts, :pvar)
+			push!(dataset, clogit_case_data(case_num , jid, jstar, dstar, Xj, Symbol(), Float64[], Symbol(), Float64[]))
+		elseif haskey(opts, :pvar) & !haskey(opts, :zvar) 
+			push!(dataset, clogit_case_data(case_num , jid, jstar, dstar, Xj, opts[:pvar], casedf[!, opts[:pvar]] ,Symbol(), Float64[]))
+		else
+			push!(dataset, clogit_case_data(case_num , jid, jstar, dstar, Xj, opts[:pvar], casedf[!, opts[:pvar]] ,opts[:zvar], casedf[!, opts[:zvar]] ))
 		end
 	end
 	return dataset
@@ -22,7 +25,7 @@ end
 function ll_clogit(beta::Vector{T}, cld::clogit_data) where T<:Real
 	LL = 0.
 	for case_data in cld 
-		@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = case_data
+		@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= case_data
 		V = Xj*beta
 		LL += V[jstar] - logsumexp(V)
 	end
@@ -32,7 +35,7 @@ end
 ll_clogit(beta::Vector{T}, cl::clogit) where T<:Real = ll_clogit(beta, cl.data)
 
 function ll_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= clcd
 	V = Xj*beta
 	LL = V[jstar] - logsumexp(V)
 	return -LL 
@@ -47,7 +50,7 @@ end
 grad_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = grad_clogit_case(beta, cld[id]) 
 
 function analytic_grad_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= clcd
 	J,K = size(Xj)
 	V = Xj*beta  
 	prob = multinomial(V)
@@ -64,7 +67,7 @@ end
 fg_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = fg_clogit_case(beta, cld[id]) 
 
 function analytic_fg_clogit_case(beta::Vector{T}, clcd::clogit_case_data) where T<:Real
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= clcd
 	J,K = size(Xj)
 	V = Xj*beta
 	LL = V[jstar] - logsumexp(V)
@@ -95,7 +98,7 @@ fgh_clogit_case(beta::Vector{T}, cld::clogit_data, id::Int64) where T<:Real = fg
 
 
 function clogit_prob(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, case_id::Symbol, choice_id::Symbol) where T<:Real
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= clcd
 	J = size(Xj,1)
 	V = Xj*beta  
 	return  DataFrame(case_id=>case_num*ones(Int64,J), 

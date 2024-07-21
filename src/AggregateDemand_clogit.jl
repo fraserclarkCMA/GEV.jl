@@ -1,208 +1,274 @@
-#=
-1. Create code computing demand derivative matrix with an existing set of choice sets and estimates
 
-2. Add one that allows for a change of price
-=#
+function new_clogit_data(df::DataFrame, clm::clogit_model, x::Vector{Float64}, xvar::Symbol)
+	
+	# Copy old xvar - dataframe modified in place
+	df[!, Symbol(:old_,xvar)] = df[!, xvar]
+	# Insert new xvar - dataframe modified in place
+	df[!, xvar] = x[df[!,clm.choice_id]]
+	# New clogit data (but same model)
+	return clogit( clm, make_clogit_data(clm, df))
 
-# New cl.data from previous commands
-function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, J::Int64,
-						xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[],)
+end 
+
+# New point special point
+function new_clogit_data(df::DataFrame, clm::clogit_model, p::Vector{Float64}, xvar::Symbol, pvar::Symbol, zvar::Symbol)
 	
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	# Old Price
+	df[!, Symbol(:old_,pvar)] = df[!, pvar]
+	# Old xvar
+	df[!, Symbol(:old_,xvar)] = deepcopy(df[!, xvar])
+	# New x 
+	df[!, pvar] = p[df[!,clm.choice_id]]
+	# New Level with interaction
+	df[!, xvar] = df[!, pvar] .* df[!, zvar];
+	return clogit( clm, make_clogit_data(clm, df))
+
+end 
+
+# Get individual demand output from their choice set
+function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, xvarpos::Int64)
 	
-	if length(xlevel_var)==0
-		xlevel_var = Xj[:, xvarpos]
-	end
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z = clcd
+	
+	jid = convert.(Int64, jid)
 
 	# Step 1: get price terms
-	J_CSi = size(Xj,1)
-	alpha_x_xvar = zeros(J_CSi)
-	all_xvars = vcat(xvarpos, interacted_xvarpos)
-	for inds in all_xvars
+	J = size(Xj,1)
+	alpha_x_xvar = zeros(J)
+	alpha_x_xvar .+= Xj[:,xvarpos]*beta[xvarpos]
+
+	# Step 2: Get prob purchase
+	V = Xj*beta
+	s = multinomial(V)
+	cw = logsumexp(V)
+
+	temp_own = alpha_x_xvar .* (1 .- s) .* s  ./ Xj[:, xvarpos]
+	temp_cross = -alpha_x_xvar .* s ./ Xj[:, xvarpos]
+	dsdx = (repeat(temp_cross, 1, J) .* repeat(s, 1, J)') .* (1 .- I(J)) .+ diagm(temp_own)
+
+	if pvar == zvar == Symbol()
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, Float64[], Float64[])
+	elseif  zvar == Symbol()
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, p, Float64[])
+	else 
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, p, z)
+	end 
+end
+
+
+# Get individual demand output from their choice set with interactions in xvar passed in xvarpos
+function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, xvarpos::Int64, xzvarpos::Int64)
+	
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z = clcd
+	
+	jid = convert.(Int64, jid)
+
+	# Step 1: get price terms
+	J = size(Xj,1)
+	alpha_x_xvar = zeros(J)
+	allvars = vcat(xvarpos, xzvarpos)
+	for inds in allvars
 		alpha_x_xvar .+= Xj[:,inds]*beta[inds]
 	end	
 
 	# Step 2: Get prob purchase
 	V = Xj*beta
-	PROBi = multinomial(V)
+	s = multinomial(V)
+	cw = logsumexp(V)
 
+	temp_own = alpha_x_xvar .* (1 .- s) .* s  ./ Xj[:, xvarpos]
+	temp_cross = -alpha_x_xvar .* s ./ Xj[:, xvarpos]
+	dsdx = (repeat(temp_cross, 1, J) .* repeat(s, 1, J)') .* (1 .- I(J)) .+ diagm(temp_own)
 
-	temp_own = alpha_x_xvar .* (1 .- PROBi) .* PROBi ./ xlevel_var
-	temp_cross = -alpha_x_xvar .* PROBi ./ xlevel_var
-	temp_own[isnan.(temp_own)] .= 0
-	temp_cross[isnan.(temp_cross)] .= 0
-
-	# Step 3: Get individual outputs
-	DQi = zeros(J,J)
-	@inbounds for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
-		if j==k
-			DQi[j,k] = temp_own[nj]
-		else 
-			DQi[j,k] = temp_cross[nj] * PROBi[nk]
-		end
+	if pvar == zvar == Symbol()
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, Float64[], Float64[])
+	elseif  zvar == Symbol()
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, p, Float64[])
+	else 
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, p, z)
 	end 
-
-
-#=
-	# Step 3: Get individual outputs
-	DQi = zeros(J,J)
-	@inbounds for (nj,j) in enumerate(jid), (nk,k) in enumerate(jid)
-		if xlevel_var[nj]==0 
-			nothing
-		elseif j==k
-			DQi[j,k] = alpha_x_xvar[nj] .* (1 .- PROBi[nj]) .* PROBi[nj] ./ xlevel_var[nj]
-		else 
-			DQi[j,k] = -alpha_x_xvar[nj] .* PROBi[nj] .* PROBi[nk] / xlevel_var[nj]
-		end
-	end 
-=#
-	# Allow for choice set hetergeneity so add indicator functions
-	PRODSi = zeros(Int64,J)
-	PRODSi[jid] .= 1
-	PROB = zeros(Float64,J)
-	PROB[jid] .= PROBi
-
-	return (PRODS = PRODSi, CTR = PRODSi*PRODSi', PROB=PROB, DQ = DQi , CW = logsumexp(V))
-
 end
 
-# Loop over all choice sets
-function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit,
-							xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
+# Get individual demand output from their choice set with interactions in xvar passed in xvarpos
+function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, xvarpos::Int64, xzvarpos::Vector{Int64})
+	
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z = clcd
+	
+	jid = convert.(Int64, jid)
+
+	# Step 1: get price terms
+	J = size(Xj,1)
+	alpha_x_xvar = zeros(J)
+	allvars = vcat(xvarpos, xzvarpos)
+	for inds in allvars
+		alpha_x_xvar .+= Xj[:,inds]*beta[inds]
+	end	
+
+	# Step 2: Get prob purchase
+	V = Xj*beta
+	s = multinomial(V)
+	cw = logsumexp(V)
+
+	temp_own = alpha_x_xvar .* (1 .- s) .* s  ./ Xj[:, xvarpos]
+	temp_cross = -alpha_x_xvar .* s ./ Xj[:, xvarpos]
+	dsdx = (repeat(temp_cross, 1, J) .* repeat(s, 1, J)') .* (1 .- I(J)) .+ diagm(temp_own)
+
+	if pvar == zvar == Symbol()
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, Float64[], Float64[])
+	elseif  zvar == Symbol()
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, p, Float64[])
+	else 
+		return clogit_case_output(case_num, J, jid, Xj[:, xvarpos], s, dsdx, cw, p, z)
+	end 
+end
+
+
+# Loop over all individuals to create aggregate demand compononts
+function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit, xvarpos::Int64, parallel::Bool=false)
 
 	@assert eltype(df[!, cl.model.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
 
-	J = maximum(df[!, cl.model.choice_id])
-	CW = 0.
-	PRODS = zeros(Int64, J)
-	CTR = zeros(Int64, J, J)
-	PROB = zeros(Float64,J)
-	DQ = zeros(Float64, J, J)
-	@inbounds for clcd in cl.data
-		Di = DemandOutputs_clogit_case(beta, clcd, J, xvarpos, interacted_xvarpos)
-		PRODS += Di.PRODS
-		CTR += Di.CTR
-		PROB += Di.PROB
-		DQ += Di.DQ
-		CW += Di.CW
+	AD = parallel ?
+		pmap(clcd->GEV.DemandOutputs_clogit_case(beta, clcd, xvarpos), cl.data) : 
+		map(clcd->GEV.DemandOutputs_clogit_case(beta, clcd, xvarpos), cl.data);
+
+	return AD
+
+end
+
+# Loop over all individuals to create aggregate demand compononts
+function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit, xvarpos::Int64, xzvarpos::Int64, parallel::Bool=false)
+
+	@assert eltype(df[!, cl.model.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
+
+	AD = parallel ?
+		pmap(clcd->GEV.DemandOutputs_clogit_case(beta, clcd, xvarpos, xzvarpos), cl.data) : 
+		map(clcd->GEV.DemandOutputs_clogit_case(beta, clcd, xvarpos, xzvarpos), cl.data);
+
+	return AD
+
+end
+
+# Loop over all individuals to create aggregate demand compononts
+function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit, xvarpos::Int64, xzvarpos::Vector{Int64}, parallel::Bool=false)
+
+	@assert eltype(df[!, cl.model.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
+
+	AD = parallel ?
+		pmap(clcd->GEV.DemandOutputs_clogit_case(beta, clcd, xvarpos, xzvarpos), cl.data) : 
+		map(clcd->GEV.DemandOutputs_clogit_case(beta, clcd, xvarpos, xzvarpos), cl.data);
+
+	return AD
+
+end
+
+
+# Get aggregate consumer welfare
+getCW(AD::Vector{clogit_case_output}) = sum(ad.cw for ad in AD)
+
+# ---------------------------------------- #
+# Getters for product level demand outputs
+# ---------------------------------------- #
+
+getX(AD::Vector{clogit_case_output}) = sum(ad.s .* ad.x for ad in AD) ./ sum(ad.s for ad in AD)
+
+getP(AD::Vector{clogit_case_output}) = sum(ad.s .* ad.p for ad in AD) ./ sum(ad.s for ad in AD)
+
+getQty(AD::Vector{clogit_case_output}, M::Real=1) = sum(ad.s for ad in AD)
+
+function getShares(AD::Vector{clogit_case_output}) 
+	qj = getQty(AD)
+	return qj ./ sum(qj)
+end
+
+getdQdX(AD::Vector{clogit_case_output}) = sum(ad.dsdx for ad in AD)
+
+getdQdP(AD::Vector{clogit_case_output}, PdivY::Bool=false) = PdivY ? sum(ad.dsdx .* ad.z for ad in AD) : sum(ad.dsdx for ad in AD)
+
+function getDiversionRatioMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false)
+	dQdP = getdQdP(AD, PdivY)
+	return -dQdP ./ diag(dQdP)
+end 
+
+function getElasticityMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false) 
+	if PdivY 
+		Q = getQty(AD)
+		P = getP(AD)	
+		dQdP = getdQdP(AD, true)
+		return dQdP.* P ./ Q' 
+	else 
+		Q = getQty(AD)
+		X = getX(AD)	
+		dQdX = getdQdP(AD, false)
+		return dQdX.* X ./ Q' 
 	end
+end
 
-	# In case product does not show up in choice set
-	PROB = PROB ./ PRODS
-	DQ = DQ ./ CTR
-	DQ[isnan.(DQ)] .= 0.
-	PROB[isnan.(PROB)] .= 0.
+# ------------------------------------------- #
+# Getters for grouped aggregate demand outputs
+# ------------------------------------------- #
 
-	return (PROB = PROB, DQ = DQ , CW = CW) 
+# INDMAT is a G x J matrix whose [g,j]-th entry is 1 if j belongs to group g and 0 otherwise
 
-end 
+function getGroupX(AD::Vector{clogit_case_output}, INDMAT::Matrix)
+	grp_q = INDMAT*sum(ad.s for ad in AD)
+	grp_qx = INDMAT*sum(ad.s .* ad.x for ad in AD)	
+	return grp_qx ./ grp_q	
+end
 
-# New point
-function AggregateDemand(	beta::Vector, df::DataFrame, clm::clogit_model, 
-								new_xvar::Vector{Float64}, xvarname::Symbol, 
-									xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
+function getGroupP(AD::Vector{clogit_case_output}, INDMAT::Matrix)
+	grp_q = INDMAT*sum(ad.s for ad in AD)
+	grp_rev = INDMAT*sum(ad.s .* ad.p for ad in AD)	
+	return grp_rev ./ grp_q	
+end
 
-	@assert eltype(df[!, clm.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
+getGroupQty(AD::Vector{clogit_case_output}, INDMAT::Matrix, M::Real=1) = INDMAT*getQty(AD, M)
 
-	df[!, Symbol(:old_,xvarname)] = df[!, xvarname]
-	
-	# Insert new xvar
-	df[!, xvarname] = new_xvar[df[!,clm.choice_id]]
+getGroupShares(AD::Vector{clogit_case_output}, INDMAT::Matrix) = INDMAT*getShares(AD)
 
-	# New clogit data (but same model)
-	cl_new = clogit( clm, make_clogit_data(clm, df))
-
-	return AggregateDemand(beta, df, cl_new, xvarpos, interacted_xvarpos)
-
-end 
-
-# New point special point
-function AggregateDemand(beta::Vector, df::DataFrame, clm::clogit_model, 
-							new_xvar_level::Vector{Float64}, individual_varname::Symbol, xvarname::Symbol,
-								xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
-
-	@assert eltype(df[!, clm.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
-
-	# Old level
-	df[!, Symbol(:old_,clm.opts[:xlevel_id])] = df[!, clm.opts[:xlevel_id]]
-	
-	# Old interaction
-	df[!, Symbol(:old_,xvarname)] = deepcopy(df[!, xvarname])
-
-	# New Level
-	df[!, clm.opts[:xlevel_id]] = new_xvar_level[df[!,clm.choice_id]]
-
-	# New Level with old interaction
-	df[!, xvarname] = df[!, clm.opts[:xlevel_id]] .* df[!, individual_varname];
-
-
-	# New clogit data (but same model)
-	cl_new = clogit( clm, make_clogit_data(clm, df))
-
-	return AggregateDemand(beta, df, cl_new, xvarpos, interacted_xvarpos)
-
-end 
-
-
-
-#=
-# Loop over all choice sets
-function AggregateDemand(	beta::Vector, df::DataFrame, clm::clogit_model, 
-								new_xvar::Vector{Float64}, xvarname::Symbol, 
-									xvarpos::Int64, interacted_xvarpos::ScalarOrVector{Int64}=Int64[])
-
-	@assert eltype(df[!, clm.choice_id][1]) == Int64 "Enumerate choice_id to be Int64 and make new cl.model with choice_id set to this new variable"
-
-	# Write old xvar
-	df[!, Symbol(:old_,xvarname)] = df[!, xvarname]
-
-	# Insert new xvar
-	df[!, xvarname] = new_xvar[df[!,clm.choice_id]]
-
-	# New clogit data (but same model)
-	cl_new = clogit( clm, make_clogit_data(clm, df))
-
-	return AggregateDemand(beta, df, cl_new, new_xvar, xvarpos, interacted_xvarpos)
-
-end 
-=#
-# Aggregate Elasticities and Diversion Ratios
-function AggregateDiversionRatioMatrix( DQ::Matrix , INDMAT::Matrix)
-	(N,J) = size(INDMAT)
-	dsj_dpj = diag(DQ)
-	DR = zeros(N, N)
-	for a in 1:N
-		dsAdpA = sum(dsj_dpj .* INDMAT[a, :])
-		for b in 1:N 
+function getGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+	(G,J) = size(INDMAT)
+	dQdP = getdQdP(AD, PdivY)
+	dQjdPj = diag(dQdP)
+	grp_dQdP = zeros(G, G)
+	@inbounds for a in 1:G
+		grp_dQdP[a,a] = sum(dQjdPj .* INDMAT[a, :])
+		for b in 1:G
 			if a!==b
-				dsBdpA = sum(DQ.*(INDMAT[a,:]*INDMAT[b,:]'))
-				DR[a,b] = - dsBdpA / dsAdpA 
+				grp_dQdP[a,b] = sum(dQdP.*(INDMAT[a,:]*INDMAT[b,:]'))
+			end
+		end 
+	end
+	return grp_dQdP
+end 
+
+function getGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+	(G,J) = size(INDMAT)
+	dQdP = getdQdP(AD, PdivY)
+	dQjdPj = diag(dQdP)
+	DR = zeros(G, G)
+	@inbounds for a in 1:G
+		dQAdPA = sum(dQjdPj .* INDMAT[a, :])
+		for b in 1:G
+			if a!==b
+				dQBdPA = sum(dQdP.*(INDMAT[a,:]*INDMAT[b,:]'))
+				DR[a,b] = - dQBdPA / dQAdPA 
 			end
 		end 
 	end
 	return DR
 end 
 
-function AggregateElasticityMatrix( DQ::Matrix, prob::Vector, xvar::Vector, INDMAT::Matrix)
-
-	(N,J) = size(INDMAT)
-	dsj_dxj = diag(DQ)
-
-	E = zeros(N, N)
-	for a in 1:N # xA up
-		sj_in_A = prob .* INDMAT[a,:]
-		sA = sum(sj_in_A) 										
-		xA = sum(xvar .* (sj_in_A / sA)) 						
-		E[a,a] = sum(dsj_dxj .* INDMAT[a, :]) * xA / sA
-		for b in 1:N  # sB responds
-			if a!==b 
-				sj_in_B = prob .* INDMAT[b, :] 
-				sB = sum(sj_in_B)
-				E[a,b] = sum(DQ.*(INDMAT[a,:]*INDMAT[b,:]')) * xA / sB
-			end
-		end 
+function getGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)
+	if PdivY 
+		Q = getGroupQty(AD, INDMAT)
+		P = getGroupP(AD, INDMAT)	
+		dQdP = getGroupdQdP(AD, INDMAT, true)
+		return dQdP.* P ./ Q' 
+	else 
+		Q = getGroupQty(AD, INDMAT)
+		X = getGroupX(AD, INDMAT)	
+		dQdX = getGroupdQdP(AD, INDMAT)
+		return dQdX .* X ./ Q' 
 	end
-
-	return E
-
-end 
+end

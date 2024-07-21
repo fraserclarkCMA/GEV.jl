@@ -41,9 +41,12 @@ struct clogit_case_data
 	jstar 		:: Int64 				# Position of chosen option in chosen nest in the data
 	dstar 		:: Any					# Identifier of chosen option 
 	Xj			:: Matrix{Float64}		# Matrix of regressors for within-nest
-	xlevel_id 	:: Symbol 				# ID of levels of x variable
-	xlevel_var 	:: Vector 				# Levels of x variable (pass separately in case only do interaction)
+	pvar 		:: Symbol
+	p  			:: Vector	
+	zvar 		:: Symbol
+	z  			:: Vector
 end
+
 clogit_case_data() = new()
 
 clogit_data = Vector{clogit_case_data}
@@ -63,6 +66,19 @@ struct clogit_case{T<:Real}
 	G :: Vector{T}
 	H :: Matrix{T}
 end
+
+@with_kw struct clogit_case_output
+	id :: Int64
+	J :: Int64
+	jid :: Vector{Int64}
+	x :: Vector{Float64}
+	s :: Vector{Float64}
+	dsdx :: Matrix{Float64}
+	cw :: Float64
+	p :: Vector{Float64}
+	z :: Vector{Float64}
+end
+
 
 @with_kw struct nlogit_param
 	beta 	:: Vector{Real} 	# Parameters varying within an nest

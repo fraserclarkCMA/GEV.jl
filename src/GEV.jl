@@ -21,6 +21,7 @@ include("SupplySide_BertrandNash_clogit.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
 	   clogit_data, clogit_case_data, make_clogit_data, 
+	   clogit_case_output,
 	   ll_clogit, ll_clogit_case, 
 	   grad_clogit_case, analytic_grad_clogit_case, 
 	   fg_clogit_case, analytic_fg_clogit_case, 
@@ -44,10 +45,13 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_own_nlogit, grad_elas_own_nlogit,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,
-	   TS1, TS2, DemandOutputs_clogit_case, AggregateDemand,
-	   AggregateDiversionRatioMatrix, 
-	   AggregateElasticityMatrix, make_ownership_matrix, 
-	   FOC, getMC, getMARGIN
+	   TS1, TS2, new_clogit_data, getCW,
+	   DemandOutputs_clogit_case, AggregateDemand, 
+	   getX, getP, getQty, getShares, getdQdP,
+	   getDiversionRatioMatrix, getElasticityMatrix, 
+	   getGroupX, getGroupP, getGroupQty, getGroupShares, getGroupdQdP, 
+	   getGroupDiversionRatioMatrix, getGroupElasticityMatrix,
+	   make_ownership_matrix, FOC, getMC, getMARGIN
 	  
 
 end 

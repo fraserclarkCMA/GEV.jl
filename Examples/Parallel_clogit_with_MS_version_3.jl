@@ -60,50 +60,82 @@ coeftable = vcat(["Variable" "Coef." "std err"],[clm.coefnames xstar se])
 println("Log-likelihood = $(round(LLstar,digits=4))")
 vcat(["Variable" "Coef." "std err"],[cl.model.coefnames xstar se])
 
-# ----------- POST-ESTIMATION DEMAND SIDE OUTPUTS ------------- #
 
-# AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
+# ----------- POST-ESTIMATION DEMAND SIDE OUTPUTS AT A NEW PRICE POINT ------------- #
 
-df0 = deepcopy(df);
+# Impose common price to check code for clogit
+df0 = deepcopy(df); # Data to add a new common price to
 
-# No interactions
-pos_price = findall(cl.model.coefnames .== "cost")[1] # Must be an Int()
-pos_price_interactions = findall(cl.model.coefnames .== "cost & invY")[1] 
-AD = AggregateDemand(xstar, df0, cl, pos_price, pos_price_interactions )
-AD.PROB
-AD.DQ
+# No interactions with individual characteristics
+pos_price = 1
+pos_invY = 4
+P0 = getX(AggregateDemand(xstar, df0, cl, pos_price, pos_invY));
 
-# ----- NEW PRICE POINT ---- #
+cl0 = new_clogit_data(df0, clm, P0, :cost);
 
-# AGGREGATE DEMAND DERIVATIVE MATRIX AND PURCHASE PROBABILITIES 
+# Product level output
+AD = AggregateDemand(xstar, df0, cl0, pos_price, pos_invY);
+Q = getQty(AD)
+s = getShares(AD)
+P = getX(AD)
+dQdP = getdQdP(AD)
+dsdP = dQdP ./ length(AD)
+DR = getDiversionRatioMatrix(AD)
+E = getElasticityMatrix(AD)
 
-# Evaluate at New Point
-df_NEW = combine(groupby(df0, :restaurant), :cost => mean => :cost )
-PRICE0 = df_NEW.cost
-AD = AggregateDemand(xstar, df0, cl.model, PRICE0, :cost, pos_price, pos_price_interactions )
-AD.PROB
-AD.DQ
-CW0 = AD.CW
+# ----------- POST-ESTIMATION GROUPED DEMAND SIDE OUTPUTS ------------- #
 
-# FIRM LEVEL DIVERSION RATIO
-firm_df = combine(groupby(df0, :pid), :restaurant => unique => :brand, :owner => unique => :owner, :cost=> mean => :price)
+# Get group product selector matrix
+firm_df = combine(groupby(df0, :pid), 
+					:restaurant => unique => :brand, 
+							:owner => unique => :owner)
 OWN = make_ownership_matrix(firm_df, :owner)
-DR = AggregateDiversionRatioMatrix( AD.DQ , OWN.IND)
 
-# FIRM LEVEL PRICE ELASTICITY MATRIX 
-E = AggregateElasticityMatrix(AD.DQ, AD.PROB, PRICE0, OWN.IND)
+# FIRM LEVEL
+P_g = getGroupX(AD, OWN.IND)
+Q_g = getGroupQty(AD, OWN.IND)
+s_g = getGroupShares(AD, OWN.IND)
+dQdP_g = getGroupdQdP(AD, OWN.IND)
+dsdP_g = dQdP ./ length(AD)
+DR_g = getGroupDiversionRatioMatrix( AD , OWN.IND)
+E_g = getGroupElasticityMatrix(AD , OWN.IND)
 
-# ----------- SUPPLY SIDE ----------- #
+# ----------- POST-ESTIMATION SUPPLY-SIDE OUTPUTS ------------- #
 
-# BACK OUT MARGINAL COSTS
-MC = getMC(AD.PROB, PRICE0, OWN.MAT, AD.DQ)
+# Get Marginal Costs
+MC = getMC(P,Q,dQdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dQdP) \ Q
 
-# AGGREGATE MULTI-PRODUCT MARGINS (%)
-MARGIN = getMARGIN(AD.PROB, PRICE0, OWN.IND, OWN.MAT, AD.DQ)
+#= OR can use shares
+	MC = getMC(P,s,dsdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dsdP) \ s
+=#
+
+# Margins under different market structure
+MARGIN_SPN = getMARGIN(Q, P, Matrix(I(J)), Matrix(I(J)), dQdP)
+[MARGIN_SPN -1 ./ diag(E) isapprox.(MARGIN_SPN .- -1 ./ diag(E), 0; atol=1e-6)] # Check
+
+# Product margin under multiproduct industry structure
+MARGIN_MPN = getMARGIN(Q, P, Matrix(I(J)), OWN.MAT, dQdP)
+[MARGIN_MPN  (P .-MC)./P isapprox.(MARGIN_MPN .- (P .-MC)./P , 0.; atol=1e-6)] # Check
+
+# Check aggregate elasticity vs lerner at the age
+FIRM_MARGIN = getMARGIN(Q, P, OWN.IND, OWN.MAT, dQdP)
+FIRM_AS_SPN_LERNER = - 1 ./ FIRM_MARGIN # Note lerner won't match diag(E_g), aggregation across products in elasticities removes within product cross partials (they are not held fixed)
+[FIRM_AS_SPN_LERNER diag(E_g)] # LERNER >= Egg because of multiproduct effect 
+[FIRM_MARGIN -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg
 
 # ------------------ #
 # MERGER SIMULATION
 # ------------------ #
+
+# Check FOC first at pre-merger values
+df1 = deepcopy(df0);
+
+PARALLEL_FLAG = false; # Faciltates distribution of demand output calculations
+FOC0(x) = FOC(zeros(J), xstar, df1, clm, MC, OWN.MAT, x, :cost, pos_price, pos_invY, PARALLEL_FLAG)
+
+# Check
+@time FOC0(P0)
+isapprox.(FOC0(P0) , 0; atol=1e-6) 
 
 using NLsolve
 
@@ -113,18 +145,18 @@ firm_df.post_owner[firm_df.owner.==3] .= 4
 POST_OWN= make_ownership_matrix(firm_df, :post_owner)
 
 # FOC under new merger under static Bertrand-nash competition
-df1 = deepcopy(df0)
-foc(x) = FOC(zeros(J), xstar, df1, cl.model, MC, POST_OWN.MAT, x, :cost, pos_price, pos_price_interactions)
+PARALLEL_FLAG = false
+FOC1(x) = FOC(zeros(J), xstar, df1, clm, 
+			MC, POST_OWN.MAT, x, :cost, pos_price, pos_invY, PARALLEL_FLAG)
 
 # Solve for post-merger prices (start from pre-merger)
-post_res = nlsolve(foc, PRICE0)
+post_res = nlsolve(FOC1, P0)
 
 # Price Rise 
-PRICE1 = post_res.zero
-PriceIncrease = (PRICE1 .- PRICE0 ) ./ PRICE0
+P1 = post_res.zero
+PriceIncrease = (P1 .- P0 ) ./ P0
 
 # Consumer Welfare Change
-CW0 = AggregateDemand(xstar, df0, cl.model, PRICE0, :cost, pos_price, pos_price_interactions ).CW
-CW1 = AggregateDemand(xstar, df1, cl.model, PRICE1, :cost, pos_price, pos_price_interactions ).CW
+CW0 = getCW(AggregateDemand(xstar, df0, cl0, pos_price, pos_invY))
+CW1 = getCW(AggregateDemand(xstar, df1, new_clogit_data(df1, clm, P1, :cost), pos_price, pos_invY))
 CW_CHANGE = CW1/CW0 - 1
-

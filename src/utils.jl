@@ -1,5 +1,4 @@
 
-eye(N::Int64) = Matrix(1.0I,N,N)
 
 function categorical!(df::DataFrame, x::Symbol)
 	df[!, x] = categorical(df.x)

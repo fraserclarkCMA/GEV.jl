@@ -3,7 +3,7 @@
 
 function elas_own_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64, 
 							case_id::Symbol, choice_id::Symbol, xvar_indices::Vector{Int64}) where T<:Real
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= clcd
 	
 	# Step 1: get price terms
 	J = size(Xj,1)
@@ -42,7 +42,7 @@ elas_own_clogit(beta::Vector{T}, cl::clogit, xvar_indices::Vector{Int64}) where 
 
 function elas_cross_clogit(beta::Vector{T}, clcd::clogit_case_data, outside_share::Float64,
 							case_id::Symbol, choice_id::Symbol, xvar_indices::Vector{Int64}) where T<:Real
-	@unpack case_num, jid, jstar, dstar, Xj, xlevel_id, xlevel_var = clcd
+	@unpack case_num, jid, jstar, dstar, Xj, pvar, p, zvar, z= clcd
 	small = eps()
 
 	# Step 1: get price terms
