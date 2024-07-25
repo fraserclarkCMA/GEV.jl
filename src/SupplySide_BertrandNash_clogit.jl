@@ -5,6 +5,17 @@ function make_ownership_matrix(df::DataFrame, groupvar::Symbol)
 	return ( IND = indmat, MAT = indmat'*indmat)
 end
 
+# Make Sparse Ownership Matrix
+function make_ownership_matrix(df::DataFrame, groupvar::Symbol, pidvar::Symbol)
+	N = maximum(df[!, groupvar])
+	J = maximum(df[!, pidvar])
+	indmat = spzeros(N,J)
+	for row in eachrow(df)
+		indmat[row[groupvar], row[pidvar]] = 1
+	end
+	return ( IND = indmat, MAT = indmat'*indmat)
+end
+
 getMC(P::Vector, Q::Vector, dQdP::Matrix, OWN::Matrix) = P + (OWN .* dQdP)\Q
 
 function getMARGIN(Q::Vector, P::Vector, IND::Matrix, OWN::Matrix, dQdP::Matrix)

@@ -1,7 +1,7 @@
 module GEV
 
 using DataFrames, StatsModels, ForwardDiff, Parameters, LinearAlgebra, Optim, TSVD, ParallelDataTransfer, CategoricalArrays
-using StatsBase, Statistics
+using StatsBase, Statistics, SparseArrays
 
 using Distributed
 
@@ -49,8 +49,12 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   DemandOutputs_clogit_case, AggregateDemand, 
 	   getX, getP, getQty, getShares, getdQdP,
 	   getDiversionRatioMatrix, getElasticityMatrix, 
+	   spgetX, spgetP, spgetQty, spgetShares, spgetdQdP,
+	   spgetDiversionRatioMatrix, spgetElasticityMatrix, 
 	   getGroupX, getGroupP, getGroupQty, getGroupShares, getGroupdQdP, 
 	   getGroupDiversionRatioMatrix, getGroupElasticityMatrix,
+	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetGroupdQdP, 
+	   spgetGroupDiversionRatioMatrix, spgetGroupElasticityMatrix,
 	   make_ownership_matrix, FOC, getMC, getMARGIN
 	  
 

@@ -163,12 +163,15 @@ function AggregateDemand(beta::Vector, df::DataFrame, cl::clogit, xvarpos::Int64
 end
 
 
+# ALL OF MY SUM FUNCTIONS NEED TO BE SPARSE + SPOWNERSHIP MATRIX
+
 # Get aggregate consumer welfare
 getCW(AD::Vector{clogit_case_output}) = sum(ad.cw for ad in AD)
 
 # ---------------------------------------- #
 # Getters for product level demand outputs
 # ---------------------------------------- #
+
 
 getX(AD::Vector{clogit_case_output}) = sum(ad.s .* ad.x for ad in AD) ./ sum(ad.s for ad in AD)
 
@@ -201,6 +204,72 @@ function getElasticityMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false)
 		X = getX(AD)	
 		dQdX = getdQdP(AD, false)
 		return dQdX.* X ./ Q' 
+	end
+end
+
+# ---------------------------------------- #
+# Sparse Getters for product level demand outputs
+# ---------------------------------------- #
+
+function spgetX(AD::Vector{clogit_case_output})
+	num = sum(sparsevec(ad.jid, ad.s .* ad.x) for ad in AD) 
+	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
+	return sparsevec(denom.nzind, num.nzval ./ denom.nzval)
+end
+
+function spgetP(AD::Vector{clogit_case_output}) 
+	num = sum(sparsevec(ad.jid, ad.s .* ad.p) for ad in AD) 
+	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
+	return sparsevec(denom.nzind, num.nzval ./ denom.nzval)
+end
+
+spgetQty(AD::Vector{clogit_case_output}, M::Real=1) = sum(sparsevec(ad.jid, ad.s) for ad in AD)
+
+function spgetShares(AD::Vector{clogit_case_output}) 
+	qj = spgetQty(AD)
+	return qj ./ sum(qj)
+end
+
+function spgetdQdX(AD::Vector{clogit_case_output}) 
+	J = maximum(maximum(ad.jid) for ad in AD)
+	return  sum(sparse(repeat(ad.jid, 1, ad.J)[:], repeat(ad.jid, 1, ad.J)'[:], ad.dsdx[:], J, J) for ad in AD)
+end
+
+function spgetdQdP(AD::Vector{clogit_case_output}, PdivY::Bool=false)
+	J = maximum(maximum(ad.jid) for ad in AD)
+	if PdivY 
+		return sum( sparse( repeat(ad.jid, 1, ad.J)[:], repeat(ad.jid, 1, ad.J)'[:] , (ad.z .* ad.dsdx)[:], J, J) for ad in AD)
+	else 
+		return spgetdQdX(AD)
+	end		
+end
+
+function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false)
+	dQdP = spgetdQdP(AD)
+	(J, _) = size(dQdP)
+	# Do this in a loop? 
+	DR = spzeros(J,J)
+	rows = rowvals(dQdP)
+	for j in unique(rows)
+		dQdpj = dQdP[j,:]
+		DR[j, dQdpj.nzind] = (- dQdpj / dQdP[j,j]).nzval
+	end
+	return DR
+end 
+
+function spgetElasticityMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false) 
+	if PdivY 
+		Q = spgetQty(AD)
+		P = spgetP(AD)	
+		dQdP = spgetdQdP(AD, true)
+		I = findnz(dQdP)
+		return sparse(I[1], I[2],  dQdP.nzval .* (P.nzval ./ Q.nzval')[:]) 
+	else 
+		Q = spgetQty(AD)
+		X = spgetX(AD)	
+		dQdX = spgetdQdP(AD, false)
+		I = findnz(dQdX)
+		return sparse(I[1], I[2],  dQdX.nzval .* (X.nzval ./ Q.nzval')[:]) 
 	end
 end
 
@@ -270,5 +339,81 @@ function getGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix
 		X = getGroupX(AD, INDMAT)	
 		dQdX = getGroupdQdP(AD, INDMAT)
 		return dQdX .* X ./ Q' 
+	end
+end
+
+
+# ------------------------------------------- #
+# Sparse Getters for grouped aggregate demand outputs
+# ------------------------------------------- #
+
+# INDMAT is a G x J matrix whose [g,j]-th entry is 1 if j belongs to group g and 0 otherwise
+
+function spgetGroupX(AD::Vector{clogit_case_output}, INDMAT::Matrix)
+	num = sum(sparsevec(ad.jid, ad.s .* ad.x) for ad in AD) 
+	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
+	grp_q = INDMAT*denom
+	grp_qx = INDMAT*num	
+	return grp_qx ./ grp_q	
+end
+
+function spgetGroupP(AD::Vector{clogit_case_output}, INDMAT::Matrix)
+	num = sum(sparsevec(ad.jid, ad.s .* ad.p) for ad in AD) 
+	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
+	grp_q = INDMAT*denom
+	grp_rev = INDMAT*num	
+	return grp_rev ./ grp_q	
+end
+
+spgetGroupQty(AD::Vector{clogit_case_output}, INDMAT::Matrix, M::Real=1) = INDMAT*spgetQty(AD, M)
+
+spgetGroupShares(AD::Vector{clogit_case_output}, INDMAT::Matrix) = INDMAT*spgetShares(AD)
+
+function spgetGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+	(G,J) = size(INDMAT)
+	dQdP = spgetdQdP(AD, PdivY)
+	dQjdPj = diag(dQdP)
+	grp_dQdP = spzeros(G, G)
+	@inbounds for a in 1:G
+		grp_dQdP[a,a] = sum(dQjdPj .* INDMAT[a, :])
+		for b in 1:G
+			if a!==b
+				grp_dQdP[a,b] = sum(dQdP.*(INDMAT[a,:]*INDMAT[b,:]'))
+			end
+		end 
+	end
+	return grp_dQdP
+end 
+
+function spgetGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+	(G,J) = size(INDMAT)
+	dQdP = spgetdQdP(AD, PdivY)
+	dQjdPj = diag(dQdP)
+	DR = zeros(G, G)
+	@inbounds for a in 1:G
+		dQAdPA = sum(dQjdPj .* INDMAT[a, :])
+		for b in 1:G
+			if a!==b
+				dQBdPA = sum(dQdP.*(INDMAT[a,:]*INDMAT[b,:]'))
+				DR[a,b] = - dQBdPA / dQAdPA 
+			end
+		end 
+	end
+	return DR
+end 
+
+function spgetGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)
+	if PdivY 
+		Q = spgetGroupQty(AD)
+		P = spgetGroupP(AD)	
+		dQdP = spgetGroupdQdP(AD, true)
+		I = findnz(dQdP)
+		return sparse(I[1], I[2],  dQdP.nzval .* (P.nzval ./ Q.nzval')[:]) 
+	else 
+		Q = spgetGroupQty(AD)
+		X = spgetGroupX(AD)	
+		dQdX = spgetGroupdQdP(AD, false)
+		I = findnz(dQdX)
+		return sparse(I[1], I[2],  dQdX.nzval .* (X.nzval ./ Q.nzval')[:]) 
 	end
 end
