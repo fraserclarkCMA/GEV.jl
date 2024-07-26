@@ -25,6 +25,35 @@ function new_clogit_data(df::DataFrame, clm::clogit_model, p::Vector{Float64}, x
 
 end 
 
+# Sparse methods
+function new_clogit_data(df::DataFrame, clm::clogit_model, x::SparseVector, xvar::Symbol)
+	
+	# Copy old xvar - dataframe modified in place
+	df[!, Symbol(:old_,xvar)] = df[!, xvar]
+	# Insert new xvar - dataframe modified in place
+	df[!, xvar] = x[df[!,clm.choice_id]]
+	# New clogit data (but same model)
+	return clogit( clm, make_clogit_data(clm, df))
+
+end 
+
+# New point special point
+function new_clogit_data(df::DataFrame, clm::clogit_model, p::SparseVector, xvar::Symbol, pvar::Symbol, zvar::Symbol)
+	
+	# Old Price
+	df[!, Symbol(:old_,pvar)] = df[!, pvar]
+	# Old xvar
+	df[!, Symbol(:old_,xvar)] = deepcopy(df[!, xvar])
+	# New x 
+	df[!, pvar] = p[df[!,clm.choice_id]]
+	# New Level with interaction
+	df[!, xvar] = df[!, pvar] .* df[!, zvar];
+	return clogit( clm, make_clogit_data(clm, df))
+
+end 
+
+
+
 # Get individual demand output from their choice set
 function DemandOutputs_clogit_case(beta::Vector, clcd::clogit_case_data, xvarpos::Int64)
 	
@@ -262,14 +291,16 @@ function spgetElasticityMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false
 		Q = spgetQty(AD)
 		P = spgetP(AD)	
 		dQdP = spgetdQdP(AD, true)
+		Eidx =sparsevec(dQdP[:]).nzind
 		I = findnz(dQdP)
-		return sparse(I[1], I[2],  dQdP.nzval .* (P.nzval ./ Q.nzval')[:]) 
+		return sparse(I[1], I[2], (dQdX.nzval .* (P ./ Q')[Eidx])[:]) 
 	else 
 		Q = spgetQty(AD)
 		X = spgetX(AD)	
 		dQdX = spgetdQdP(AD, false)
+		Eidx =sparsevec(dQdX[:]).nzind
 		I = findnz(dQdX)
-		return sparse(I[1], I[2],  dQdX.nzval .* (X.nzval ./ Q.nzval')[:]) 
+		return sparse(I[1], I[2], (dQdX.nzval .* (X ./ Q')[Eidx])[:]) 
 	end
 end
 
