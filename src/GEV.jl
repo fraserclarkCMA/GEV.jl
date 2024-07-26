@@ -55,7 +55,7 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   getGroupDiversionRatioMatrix, getGroupElasticityMatrix,
 	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetGroupdQdP, 
 	   spgetGroupDiversionRatioMatrix, spgetGroupElasticityMatrix,
-	   make_ownership_matrix, FOC, getMC, getMARGIN
+	   make_ownership_matrix, FOC, getMC, getMARGIN, spgetMC, spgetMARGIN
 	  
 
 end 

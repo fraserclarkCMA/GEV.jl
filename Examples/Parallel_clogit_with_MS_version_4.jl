@@ -78,35 +78,37 @@ OWN = make_ownership_matrix(firm_df, :owner, :pid)
 
 # FIRM LEVEL
 P_g = spgetGroupX(AD, OWN.IND)
-Q_g = spgetGroupQty(AD, Matrix(OWN.IND))
-s_g = spgetGroupShares(AD, Matrix(OWN.IND))
-dQdP_g = spgetGroupdQdP(AD, Matrix(OWN.IND))
+Q_g = spgetGroupQty(AD, OWN.IND)
+s_g = spgetGroupShares(AD, OWN.IND)
+dQdP_g = spgetGroupdQdP(AD, OWN.IND)
 dsdP_g = dQdP ./ length(AD)
-DR_g = spgetGroupDiversionRatioMatrix( AD , Matrix(OWN.IND))
-E_g = spgetGroupElasticityMatrix(AD , Matrix(OWN.IND))
+DR_g = spgetGroupDiversionRatioMatrix( AD , OWN.IND)
+E_g = spgetGroupElasticityMatrix(AD , OWN.IND)
 
 # ----------- POST-ESTIMATION SUPPLY-SIDE OUTPUTS ------------- #
 
+# Get actively priced products
+ 
 # Get Marginal Costs
-MC = getMC(P,Q,dQdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dQdP) \ Q
+MC = spgetMC(P,Q,dQdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dQdP) \ Q
 
 #= OR can use shares
 	MC = getMC(P,s,dsdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dsdP) \ s
 =#
 
+MAXJ = maximum(maximum(ad.jid) for ad in AD);
+
 # Margins under different market structure
-MARGIN_SPN = getMARGIN(Q, P, Matrix(I(J)), Matrix(I(J)), dQdP)
-[MARGIN_SPN -1 ./ diag(E) isapprox.(MARGIN_SPN .- -1 ./ diag(E), 0; atol=1e-6)] # Check
+INDMAT = sparse(I(MAXJ))
+OWNMAT = sparse(I(MAXJ))
+MARGIN_SPN = spgetMARGIN(P, Q, dQdP, INDMAT, OWNMAT)
 
 # Product margin under multiproduct industry structure
-MARGIN_MPN = getMARGIN(Q, P, Matrix(I(J)), OWN.MAT, dQdP)
-[MARGIN_MPN  (P .-MC)./P isapprox.(MARGIN_MPN .- (P .-MC)./P , 0.; atol=1e-6)] # Check
+MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(MAXJ)), OWN.MAT)
 
 # Check aggregate elasticity vs lerner at the age
-FIRM_MARGIN = getMARGIN(Q, P, OWN.IND, OWN.MAT, dQdP)
+FIRM_MARGIN = spgetMARGIN(P, Q, dQdP, OWN.IND, OWN.MAT)
 FIRM_AS_SPN_LERNER = - 1 ./ FIRM_MARGIN # Note lerner won't match diag(E_g), aggregation across products in elasticities removes within product cross partials (they are not held fixed)
-[FIRM_AS_SPN_LERNER diag(E_g)] # LERNER >= Egg because of multiproduct effect 
-[FIRM_MARGIN -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg
 
 # ------------------ #
 # MERGER SIMULATION

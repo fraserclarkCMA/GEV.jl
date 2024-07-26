@@ -97,15 +97,17 @@ MC = getMC(P,Q,dQdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dQdP) \ Q
 =#
 
 # Margins under different market structure
-MARGIN_SPN = getMARGIN(Q, P, Matrix(I(J)), Matrix(I(J)), dQdP)
+INDMAT = Matrix(I(J))
+OWNMAT = Matrix(I(J))
+MARGIN_SPN = getMARGIN(P, Q, dQdP, INDMAT , OWNMAT)
 [MARGIN_SPN -1 ./ diag(E) isapprox.(MARGIN_SPN .- -1 ./ diag(E), 0; atol=1e-6)] # Check
 
 # Product margin under multiproduct industry structure
-MARGIN_MPN = getMARGIN(Q, P, Matrix(I(J)), OWN.MAT, dQdP)
+MARGIN_MPN = getMARGIN(P, Q, dQdP, INDMAT, OWN.MAT)
 [MARGIN_MPN  (P .-MC)./P isapprox.(MARGIN_MPN .- (P .-MC)./P , 0.; atol=1e-6)] # Check
 
 # Check aggregate elasticity vs lerner at the age
-FIRM_MARGIN = getMARGIN(Q, P, OWN.IND, OWN.MAT, dQdP)
+FIRM_MARGIN = getMARGIN(P, Q, dQdP, OWN.IND, OWN.MAT)
 FIRM_AS_SPN_LERNER = - 1 ./ FIRM_MARGIN # Note lerner won't match diag(E_g), aggregation across products in elasticities removes within product cross partials (they are not held fixed)
 [FIRM_AS_SPN_LERNER diag(E_g)] # LERNER >= Egg because of multiproduct effect 
 [FIRM_MARGIN -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg

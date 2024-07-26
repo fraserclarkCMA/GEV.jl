@@ -18,12 +18,37 @@ end
 
 getMC(P::Vector, Q::Vector, dQdP::Matrix, OWN::Matrix) = P + (OWN .* dQdP)\Q
 
-function getMARGIN(Q::Vector, P::Vector, IND::Matrix, OWN::Matrix, dQdP::Matrix)
+function getMARGIN( P::Vector, Q::Vector, dQdP::Matrix, IND::Matrix, OWN::Matrix)
 	FIRM_QTY = IND .* Q'
 	PROFIT = -FIRM_QTY*((OWN.*dQdP)\Q) 
 	REVENUE =  FIRM_QTY*P
 	return PROFIT ./ REVENUE;
 end 
+
+# Sparse 
+
+function spgetMC(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, OMAT::SparseMatrixCSC)
+	Δ = Matrix(OMAT .* dQdP)[P.nzind, P.nzind] 
+	return P.nzval .+ Δ \ Q.nzval
+end 
+
+function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IMAT::SparseMatrixCSC, OMAT::SparseMatrixCSC)
+	MAXJ = length(P)
+	N = size(IMAT, 1)
+	if N == MAXJ
+        Δ = Matrix(OMAT .* dQdP)[P.nzind, P.nzind] 
+        FIRM_QTY = Matrix(IMAT .* Q')[Q.nzind, Q.nzind]
+        PROFIT = -FIRM_QTY*(Δ\Q.nzval) 
+        REVENUE =  FIRM_QTY*P.nzval
+	else
+        Δ = Matrix(OMAT .* dQdP)[P.nzind, P.nzind] 
+        FIRM_QTY = Matrix(IMAT .* Q')[:, P.nzind]
+        PROFIT = -FIRM_QTY*(Δ\Q.nzval) 
+        REVENUE =  FIRM_QTY*P.nzval
+	end
+	return PROFIT ./ REVENUE
+end 
+
 
 function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
 				 Pvarname::Symbol, Pvarpos::Int64, parallel::Bool=false)
@@ -41,6 +66,7 @@ function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEG
 	F = Q .+ (OMEGA.*dQdP)*(P - MC)
 
 end
+
 
 function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
 				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::Int64, parallel::Bool=false)

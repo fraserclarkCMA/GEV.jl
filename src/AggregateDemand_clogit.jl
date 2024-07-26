@@ -349,7 +349,7 @@ end
 
 # INDMAT is a G x J matrix whose [g,j]-th entry is 1 if j belongs to group g and 0 otherwise
 
-function spgetGroupX(AD::Vector{clogit_case_output}, INDMAT::Matrix)
+function spgetGroupX(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC)
 	num = sum(sparsevec(ad.jid, ad.s .* ad.x) for ad in AD) 
 	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
 	grp_q = INDMAT*denom
@@ -357,7 +357,7 @@ function spgetGroupX(AD::Vector{clogit_case_output}, INDMAT::Matrix)
 	return grp_qx ./ grp_q	
 end
 
-function spgetGroupP(AD::Vector{clogit_case_output}, INDMAT::Matrix)
+function spgetGroupP(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC)
 	num = sum(sparsevec(ad.jid, ad.s .* ad.p) for ad in AD) 
 	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
 	grp_q = INDMAT*denom
@@ -365,11 +365,11 @@ function spgetGroupP(AD::Vector{clogit_case_output}, INDMAT::Matrix)
 	return grp_rev ./ grp_q	
 end
 
-spgetGroupQty(AD::Vector{clogit_case_output}, INDMAT::Matrix, M::Real=1) = INDMAT*spgetQty(AD, M)
+spgetGroupQty(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC, M::Real=1) = INDMAT*spgetQty(AD, M)
 
-spgetGroupShares(AD::Vector{clogit_case_output}, INDMAT::Matrix) = INDMAT*spgetShares(AD)
+spgetGroupShares(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC) = INDMAT*spgetShares(AD)
 
-function spgetGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+function spgetGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC, PdivY::Bool=false)  
 	(G,J) = size(INDMAT)
 	dQdP = spgetdQdP(AD, PdivY)
 	dQjdPj = diag(dQdP)
@@ -385,7 +385,7 @@ function spgetGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::B
 	return grp_dQdP
 end 
 
-function spgetGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+function spgetGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC, PdivY::Bool=false)  
 	(G,J) = size(INDMAT)
 	dQdP = spgetdQdP(AD, PdivY)
 	dQjdPj = diag(dQdP)
@@ -402,18 +402,18 @@ function spgetGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::
 	return DR
 end 
 
-function spgetGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)
+function spgetGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::SparseMatrixCSC, PdivY::Bool=false)
 	if PdivY 
-		Q = spgetGroupQty(AD)
-		P = spgetGroupP(AD)	
-		dQdP = spgetGroupdQdP(AD, true)
+		Q = spgetGroupQty(AD, INDMAT)
+		P = spgetGroupP(AD, INDMAT)	
+		dQdP = spgetGroupdQdP(AD, INDMAT, true)
 		I = findnz(dQdP)
-		return sparse(I[1], I[2],  dQdP.nzval .* (P.nzval ./ Q.nzval')[:]) 
+		return dQdP .* P ./ Q' 
 	else 
-		Q = spgetGroupQty(AD)
-		X = spgetGroupX(AD)	
-		dQdX = spgetGroupdQdP(AD, false)
+		Q = spgetGroupQty(AD, INDMAT)
+		X = spgetGroupX(AD, INDMAT)	
+		dQdX = spgetGroupdQdP(AD, INDMAT, false)
 		I = findnz(dQdX)
-		return sparse(I[1], I[2],  dQdX.nzval .* (X.nzval ./ Q.nzval')[:]) 
+		return dQdX .* X ./ Q' 
 	end
 end
