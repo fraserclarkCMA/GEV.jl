@@ -243,13 +243,13 @@ end
 function spgetX(AD::Vector{clogit_case_output})
 	num = sum(sparsevec(ad.jid, ad.s .* ad.x) for ad in AD) 
 	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
-	return sparsevec(denom.nzind, num.nzval ./ denom.nzval)
+	return sparsevec(denom.nzind, num[denom.nzind] ./ denom[denom.nzind])
 end
 
 function spgetP(AD::Vector{clogit_case_output}) 
 	num = sum(sparsevec(ad.jid, ad.s .* ad.p) for ad in AD) 
 	denom = sum(sparsevec(ad.jid,ad.s) for ad in AD)
-	return sparsevec(denom.nzind, num.nzval ./ denom.nzval)
+	return sparsevec(denom.nzind, num[denom.nzind] ./ denom[denom.nzind])
 end
 
 spgetQty(AD::Vector{clogit_case_output}, M::Real=1) = sum(sparsevec(ad.jid, ad.s) for ad in AD)
