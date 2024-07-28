@@ -25,27 +25,18 @@ function getMARGIN( P::Vector, Q::Vector, dQdP::Matrix, IND::Matrix, OWN::Matrix
 	return PROFIT ./ REVENUE;
 end 
 
-# Sparse 
+# Sparse MC & Margin
 
-function spgetMC(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, OMAT::SparseMatrixCSC)
-	Δ = Matrix(OMAT .* dQdP)[P.nzind, P.nzind] 
-	return P.nzval .+ Δ \ Q.nzval
+function spgetMC(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, OMAT::SparseMatrixCSC, inside_good_idx::Vector)
+	Δ = Matrix(OMAT .* dQdP)[inside_good_idx, inside_good_idx] 
+	return Vector(P[inside_good_idx]) .+ Δ \ Vector(Q[inside_good_idx])
 end 
 
-function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IMAT::SparseMatrixCSC, OMAT::SparseMatrixCSC)
-	MAXJ = length(P)
-	N = size(IMAT, 1)
-	if N == MAXJ
-        Δ = Matrix(OMAT .* dQdP)[P.nzind, P.nzind] 
-        FIRM_QTY = Matrix(IMAT .* Q')[Q.nzind, Q.nzind]
-        PROFIT = -FIRM_QTY*(Δ\Q.nzval) 
-        REVENUE =  FIRM_QTY*P.nzval
-	else
-        Δ = Matrix(OMAT .* dQdP)[P.nzind, P.nzind] 
-        FIRM_QTY = Matrix(IMAT .* Q')[:, P.nzind]
-        PROFIT = -FIRM_QTY*(Δ\Q.nzval) 
-        REVENUE =  FIRM_QTY*P.nzval
-	end
+function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IMAT::SparseMatrixCSC, OMAT::SparseMatrixCSC, inside_good_idx::Vector)
+	Δ = Matrix(OMAT .* dQdP)[inside_good_idx, inside_good_idx] 
+	FIRM_QTY = Matrix(IMAT .* Q')[:, inside_good_idx]
+	PROFIT = -FIRM_QTY*(Δ\ Vector(Q[inside_good_idx])) 
+	REVENUE =  FIRM_QTY*Vector(P[inside_good_idx])
 	return PROFIT ./ REVENUE
 end 
 
