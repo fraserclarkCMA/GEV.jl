@@ -11,7 +11,7 @@ addprocs(3)
 end
 
 @everywhere using GEV
-using CSV, DataFrames, StatsModels, Optim, LinearAlgebra, Statistics
+using CSV, DataFrames, StatsModels, Optim, LinearAlgebra, Statistics , SparseArrays
 
 df = CSV.read(joinpath(@__DIR__,"./Git/GEV.jl/Examples/Data/restaurant.csv"), DataFrame);
 
