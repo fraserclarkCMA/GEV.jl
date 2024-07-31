@@ -41,6 +41,7 @@ function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IM
 end 
 
 
+# No interactions
 function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
 				 Pvarname::Symbol, Pvarpos::Int64, parallel::Bool=false)
 
@@ -58,7 +59,7 @@ function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEG
 
 end
 
-
+# Mask to allow interactions
 function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
 				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::Int64, parallel::Bool=false)
 
@@ -76,25 +77,8 @@ function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEG
 
 end
 
-function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
-				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::Vector{Int64}, parallel::Bool=false)
-
-	# New x -> individual choice sets
-	cl = new_clogit_data(df, clm, P, Pvarname)
-
-	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
-
-	Q = getQty(AD)
-	dQdP = getdQdP(AD)
-
-	# FOC
-	F = Q .+ (OMEGA.*dQdP)*(P - MC)
-
-end
-
 # Masks to allow for P/Y FOC 
-function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P, 
 				  xvar::Symbol, pvar::Symbol, zvar::Symbol, xvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
 
 	# New x -> individual choice sets
@@ -104,7 +88,50 @@ function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEG
 	AD = AggregateDemand(beta, df, cl, xvarpos, parallel)
 
 	Q = getQty(AD)
-	dQdP = getdQdP(AD, true)
+
+	dQdP = !haskey(clm.opts, :PdivY) : getdQdP(AD, true) : getdQdP(AD, clm.opts[:PdivY])
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
+# --------------- SPARSE PRICE IN CS SETS ----------------- #
+
+# No interactions
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+				 Pvarname::Symbol, Pvarpos::Int64, parallel::Bool=false)
+
+	Pinput = sparsevec([ig..., J], [P..., 0])
+	
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, Pinput, Pvarname)
+
+	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, Pvarpos, parallel)
+
+	Q = spgetQty(AD, J, ig)
+	dQdP = !haskey(clm.opts, :PdivY) ? spgetdQdP(AD, J, ig, false) : spgetdQdP(AD, J, ig, clm.opts[:PdivY])
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
+# Mask to allow interactions
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix{Int64}, P,
+				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::Int64, parallel::Bool=false)
+
+	Pinput = sparsevec([ig..., J], [P..., 0])
+
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, Pinput, Pvarname)
+
+	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
+
+	Q = spgetQty(AD, J, ig)
+	dQdP = !haskey(clm.opts, :PdivY) ? spgetdQdP(AD, J, ig, false) : spgetdQdP(AD, J, ig, clm.opts[:PdivY])
 
 	# FOC
 	F = Q .+ (OMEGA.*dQdP)*(P - MC)
@@ -112,3 +139,25 @@ function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEG
 end
 
 
+
+# Masks to allow for P/Y FOC with sparse price vector
+function FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P, J::Int64, ig::Vector,
+				  xvar::Symbol, pvar::Symbol, zvar::Symbol, xvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
+
+	Pinput = sparsevec([ig..., J], [P..., 0])
+
+	# New x -> individual choice sets
+	cl = new_clogit_data(df, clm, Pinput, xvar, pvar, zvar )
+
+	# Aggregate Demand	# Aggregate Demand
+	AD = AggregateDemand(beta, df, cl, xvarpos, parallel)
+
+	Q = spgetQty(AD, J, ig)
+	dQdP = !haskey(clm.opts, :PdivY) ? spgetdQdP(AD, J, ig, false) : spgetdQdP(AD, J, ig, clm.opts[:PdivY])
+
+	# FOC
+	F = Q .+ (OMEGA.*dQdP)*(P - MC)
+
+end
+
+	

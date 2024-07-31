@@ -332,7 +332,7 @@ function spgetElasticityMatrix(AD::Vector{clogit_case_output}, J::Int64, PdivY::
 		dQdP = spgetdQdP(AD, J, true)
 		Eidx = sparsevec(dQdP[:]).nzind
 		I = findnz(dQdP)
-		return sparse(I[1], I[2], (dQdX.nzval .* (P ./ Q')[Eidx])) 
+		return sparse(I[1], I[2], (dQdP.nzval .* (P ./ Q')[Eidx])) 
 	else 
 		Q = spgetQty(AD, J)
 		X = spgetX(AD, J)	
@@ -402,15 +402,16 @@ function getGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::Ma
 end 
 
 function getGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)
+	(N,J) = size(INDMAT)
 	if PdivY 
-		Q = getGroupQty(AD, J, INDMAT)
-		P = getGroupP(AD, J, INDMAT)	
-		dQdP = getGroupdQdP(AD, J, INDMAT, true)
+		Q = getGroupQty(AD, INDMAT)
+		P = getGroupP(AD, INDMAT)	
+		dQdP = getGroupdQdP(AD, INDMAT, true)
 		return dQdP.* P ./ Q' 
 	else 
-		Q = getGroupQty(AD, J, INDMAT)
-		X = getGroupX(AD, J, INDMAT)	
-		dQdX = getGroupdQdP(AD, J, INDMAT)
+		Q = getGroupQty(AD, INDMAT)
+		X = getGroupX(AD, INDMAT)	
+		dQdX = getGroupdQdP(AD, INDMAT)
 		return dQdX .* X ./ Q' 
 	end
 end
